@@ -1,0 +1,2305 @@
+---
+title: "An Exploration Into The Prosper Loan Data Set"
+author: "Calvert Louden Jr."
+date: "12/20/2018"
+output: html_document
+---
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+# Load all of the packages that you end up using in your analysis in this code
+# chunk.
+
+# Notice that the parameter "echo" was set to FALSE for this code chunk. This
+# prevents the code from displaying in the knitted HTML output. You should set
+# echo=FALSE for all code chunks in your file, unless it makes sense for your
+# report to show the code that generated a particular plot.
+
+# The other parameters for "message" and "warning" should also be set to FALSE
+# for other code chunks once you have verified that each plot comes out as you
+# want it to. This will clean up the flow of your report.
+
+library(ggplot2)
+library(gridExtra)
+library(GGally)
+library(scales)
+library(memisc)
+library(RColorBrewer)
+library(dplyr)
+
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, Load_the_Data}
+# Load the Data:
+# first I've got to set my directory
+getwd()
+setwd(paste('/Volumes/LACIE SETUP/Data_Science/',
+      'Udacity_DataAnalyst_NanoDegree_Projects/',
+      'Exploratory_Data_Analysis/Exp_Summ_Data', sep = ''))
+
+# reading in the data set with read.csv
+prsprLoanData <- read.csv('prosperLoanData.csv')
+# getting info about the data set
+str(prsprLoanData)
+
+```
+
+I chose the Prosper Loan data set and am a bit out of my element here, as I'm 
+not quite sure what questions to ask? And for the record, that's a first. 
+This loan data set has over 113,000 observations and 81 variables to explore. 
+I don't know where to start, but I think that's ok. I'll let the process of 
+exploratory data analysis lead my investigation to explore a chosen set of 
+variables and their relationship with one another. 
+
+After taking a sneak peak at the data set, I noticed quite a few factor 
+variables. Factor variables are just categorical variables that use data 
+objects to categorize the data and store it as levels; these categorical data
+objects can be either strings or integers. I'll explore these types of variables
+first to see if my exploration uncovers any patterns or anomolies that might 
+lead my journey down an unexpected path. From there, anything interesting that 
+I find or stumble upon should warrant further exploration, given the time. 
+
+That being said, I think it would interesting to analyze the exploratory 
+factor variables and see if there is any relationship with what we as consumers
+care about most, our interest rate on the loan, or in this case the exploratory
+variable **'BorrowerRate'**. 
+
+# Univariate Plots Section
+
+### Borrower Rate Plot:
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=5, fig.width=10}
+# generating a summary of the variable 'Borrower Rate'
+summary(prsprLoanData$BorrowerRate)
+range(prsprLoanData$BorrowerRate)
+# plotting the BorrowerRate within the data set
+p1 <- ggplot(aes(x = BorrowerRate), data = prsprLoanData) +
+        geom_histogram(color = 'black', fill = I('#099009')) +
+        scale_x_continuous(limits = c(0, 0.6), breaks = seq(0, 0.6, 0.2))
+
+# plotting the Borrower Rate with an x-axis scale of square root
+p2 <- ggplot(aes(x = BorrowerRate), data = prsprLoanData) +
+          geom_histogram(color = 'black', fill = I('#099009')) +
+          scale_x_sqrt(limits = c(0, 0.6), breaks = seq(0, 0.6, 0.2)) +
+          scale_y_sqrt()
+
+# plotting the Borrower Rate with an x-axis scale of log10() to further 
+# epxlore the distribution patterns of Borrower Rate
+p3 <- ggplot(aes(x = log10(BorrowerRate + 1)), data = prsprLoanData) +
+          geom_histogram(color = 'black', fill = I('#099009')) 
+
+grid.arrange(p1, p2, p3, ncol = 1)
+
+```
+ 
+This particular plot analyzes the distribution of borrower rates within the 
+data set. Based on this plot summarization and the output of the `range()` 
+function on the variable **'BorrowerRate'**, we can confirm and see the lower 
+limit of borrower rate at 0.0%, and the upper limit at 0.4975%. 
+
+### Loan Status Plot:
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=5, fig.width=11}
+# aggregating the factor variable Loan Status by count
+table(prsprLoanData$LoanStatus)
+
+# grouping the data by loan status, then generating some basic stats
+loan_stat_grp <- group_by(prsprLoanData, LoanStatus)
+
+lnStats_by_LoanSts <- summarise(loan_stat_grp,
+                                borrower_rate_mean = mean(BorrowerRate),
+                                borrower_rate_median = median(BorrowerRate),
+                                borrower_rate_min = min(BorrowerRate),
+                                borrower_rate_max = max(BorrowerRate),
+                                monthly_income_mean = mean(StatedMonthlyIncome),
+                                loan_amount_mean = mean(LoanOriginalAmount),
+                                n = n())
+lnStats_by_LoanSts
+
+# plotting loan status counts
+ggplot(aes(x = LoanStatus), data = prsprLoanData) +
+  geom_histogram(aes(color = LoanStatus), stat = 'count') +
+  scale_y_sqrt() 
+
+```
+
+This particular plot aggregates the counts for each level of **'LoanStatus'**.
+As a factor variable, we can clearly see the count variance between levels.
+Based on the `table()` function, which aggregates our data, we can see that the
+level **'Current'** has the largest count with 56,576 observations, while
+**'Cancelled'** has only 5 observations, and lastly, 205 lucky souls have their
+**'FinalPaymentInProgress'**. Let's take a look at the loan stats by loan status 
+data frame I created and see how that plots out. It would be interesting to see
+the mean variance between loan status levels for some of the exploratory
+variables I've created in the **'lnStats_by_LoanSts'** data frame. 
+
+### Exploration of the data frame 'LnStats_by_LoanSts'
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=11, fig.width=10}
+# plotting the borrower rate mean for loan stats by loan status
+p4 <- ggplot(aes(x = borrower_rate_mean), data = lnStats_by_LoanSts) +
+        geom_histogram(color = 'green') 
+
+# plotting the monthly income mean for loan stats by loan status
+p5 <- ggplot(aes(x = monthly_income_mean), data = lnStats_by_LoanSts) +
+          geom_histogram(color = 'red')
+
+# plotting the borrower rate mean based on the parent exploratory variable,
+# Loan Status
+p6 <- qplot(x = borrower_rate_mean, data = lnStats_by_LoanSts, 
+            color = lnStats_by_LoanSts$LoanStatus) +
+          theme(legend.position = 'top')
+
+grid.arrange(p4, p5, p6, ncol = 1)
+
+```
+
+These above plots are related to the **'lnStats_by_LoanSts'** data frame created
+to further explore the Loan Status variable. Our first of three, we have the
+borrower rate mean grouped by loan status. The plot itself however just shows
+the counts of borrower rate means. The second plot is the average monthly
+income per category of **'LoanStatus'**, but it too only shows the counts of
+monthly averaged incomes. The final plot however, goes back to our plot of the
+borrower rate mean for each level in **'LoanStatus'**, except here, we are
+adding the hue of, or filtering by factor(categorcial) parent variable,
+**'LoanStatus'**. It would be interesting to see which level in **'LoanStatus'**
+has the lowest median borrower rate?
+
+### Employment Status Plot:
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=7, fig.width=10}
+# generating a summary of the variable 'Employment Status'
+summary(prsprLoanData$EmploymentStatus)
+
+# grouping data frame by employment status
+emplymt_grp <- group_by(prsprLoanData, EmploymentStatus)
+
+pLD_by_Emp_Grp <- summarise(emplymt_grp, 
+                            borrower_rate_mean = mean(BorrowerRate),
+                            mthly_inc_mean = mean(StatedMonthlyIncome),
+                            list_cat_median = median(ListingCategory..numeric.),
+                            n = n())
+pLD_by_Emp_Grp
+
+# plotting employment status
+ggplot(aes(x = EmploymentStatus), data = prsprLoanData) +
+  geom_histogram(aes(color = EmploymentStatus), stat = 'count') +
+  scale_y_sqrt()
+```
+
+This plot conveys the employment status of the borrower at the time they posted
+the listing, or application for a loan. We can see here that the level
+**'Employed'** has the largest count or 'max' count, with 67,322 observations 
+and **'Not employed'** the least count or 'min' count, with 835 observations.
+It would be interesting to further explore if any of these unemployed applicants
+were approved for their loan. Or better yet, check out the variables I've 
+created with a couple plots. Maybe, if I have time...
+
+### Income Range Plot:
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=5, fig.width=10}
+# generating a summary of the variable 'Income Range'
+summary(prsprLoanData$IncomeRange)
+# plotting income range
+ggplot(aes(x = IncomeRange), data = prsprLoanData) +
+  geom_histogram(aes(color = IncomeRange), stat = 'count') 
+```
+
+This is an interesting plot. If you're not careful, you can be fooled by what 
+you see, which isn't incorrect. However, it is misleading.  Here we have a plot
+that attempts to convey the counts of levels within the variable 
+**'IncomeRange.'** It even looks normally distributed, but it's not. The levels 
+in income range are not ordered in ascending order( the $100,000+ income range 
+is the 3rd variable in the sequence, but the last variable within the factored 
+levels). Let's try plotting the ordred factor variable, income range and see 
+how our plots differ.
+
+### Replotting 'Income Range' with ordered factor variable: 
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=5, fig.width=10}
+# checking the levels of factor variable Income Range
+levels(prsprLoanData$IncomeRange)
+# setting the order of levels for factor variable 'Income Range'
+prsprLoanData$IncomeRange <- ordered(prsprLoanData$IncomeRange,
+                                     levels = c('$0', '$1-24,999',
+                                                '$25,000-49,999',
+                                                '$50,000-74,999',
+                                                '$75,000-99,999',
+                                                '$100,000+',
+                                                'Not displayed',
+                                                'Not employed'))
+# plotting the factor variable Income Range
+ggplot(aes(x = IncomeRange), data = prsprLoanData) +
+  geom_histogram(aes(color = IncomeRange), stat = 'count') 
+```
+
+That's better. Now we can the true distribution of loanees with a given income
+range. I wonder what the level of correlation is between income range and 
+borrower rate? That may be something I'll have to explore later on.  
+
+### Prosper Score Plot: 
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=5, fig.width=10}
+# generating a summary of the variable Prosper Score
+summary(prsprLoanData$ProsperScore)
+# aggreating the factor variable Prosper Score by count
+table(prsprLoanData$ProsperScore)
+# plotting prosper score
+p7 <- ggplot(aes(x = ProsperScore), 
+             data = subset(prsprLoanData, !is.na(ProsperScore))) +
+          geom_histogram(color = 'black', fill = I('#099009'), stat = 'count')
+
+# zooming in on histogram of Prosper Scores between 3 and 9
+p8 <- ggplot(aes(x = ProsperScore), data = prsprLoanData) +
+          geom_histogram(color = 'red', stat = 'count') +
+          scale_x_continuous(limits = c(2, 10), breaks = seq(2, 10, 1)) +
+          scale_y_sqrt(limits = c(0, 15000), breaks = seq(0, 15000, 3000))
+
+grid.arrange(p7, p8, ncol = 1)
+```
+
+The Prosper score is a custom risk score built using historical Prosper data.
+The score ranges from 1 - 10, with 10 being the best, or lowest risk score.
+Here we have a count of all the observations within the data set filtered by
+their **'ProsperScore'**. This looks like a normal distribution of
+**'ProsperScore'**, with a majority of observations categorized with a score
+of 4 - 8. The subsequent plot zooms in on Prosper scores between 3 and 9.
+By doing so, we're able to clearly see the variance in counts between these
+Prosper scores.
+
+### Is the Borrower A Homeowner Plot: 
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.width=8}
+# generating a summary of the variable 'Is The Borrower A Homeowner'
+summary(prsprLoanData$IsBorrowerHomeowner)
+# plotting IsBorrowerHomeowner
+ggplot(aes(x = IsBorrowerHomeowner), data = prsprLoanData) +
+  geom_histogram(stat = 'count') +
+  scale_y_continuous(limits = c(0, 60000), breaks = seq(0, 60000, 2500))
+```
+
+The plot here shows the distribution of applicants who were classified as
+homeowners vs. applicants who are not homeowners. Home ownership within this
+data set is defined as having a mortgage on their credit profile at the time of
+submitting their loan application, or they were able to provide documentation
+confirming homeownership. It seems pretty clear the distribution of the data
+set is almost even. Based on the summary report function ran on the variable
+**'IsBorrowerHomeowner'**, we see non-homeowner applicants with a count of
+56,459 and a homeowner applicant count of 57,478. 
+
+### Credit Score Range Lower & Credit Score Range Upper Plots
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=10, fig.width=10}
+# In exploring these variables I recognized it would be more efficient and 
+# effective if I created a Credit Range Bucket factor variable to more easily
+# analyze the distribution of credit ranges for Prosper customers.
+
+# checking the range (min & max) for both exploratory variables
+summary(prsprLoanData$CreditScoreRangeLower)
+
+summary(prsprLoanData$CreditScoreRangeUpper)
+
+# creating a credit range bucket factor variable to better assess the data
+prsprLoanData$CreditRange.bucket <- cut(prsprLoanData$CreditScoreRangeLower,
+                                        breaks = c(0, 50, 100, 150, 200, 250,
+                                                   300, 350, 400, 450, 500,
+                                                   550, 600, 650, 700, 750,
+                                                   800, 850, 900, 950))
+
+# summing our newly created exploratory variable by credit range
+table(prsprLoanData$CreditRange.bucket)
+
+# plot showing distribution of the Credit Score Range Lower
+p9 <- ggplot(aes(x = CreditScoreRangeLower), 
+              data = subset(prsprLoanData, !is.na(CreditScoreRangeLower))) +
+          geom_histogram(stat = 'count', fill = I('#F79420'), color = I('black'), 
+                        shape = 21) +
+          scale_y_sqrt()
+
+# plot showing distribution of the Credit Score Range Upper
+p10 <- ggplot(aes(x = CreditScoreRangeUpper), 
+              data = subset(prsprLoanData, !is.na(CreditScoreRangeUpper))) +
+          geom_histogram(stat = 'count', fill = I('#C88430'), color = I('black'),
+                         shape = 21) +
+          scale_y_sqrt()
+
+# plot showing the count of credit scores within the factor variable 
+# 'CreditRange.bucket' range
+p11 <- ggplot(aes(x = CreditRange.bucket), 
+              data = subset(prsprLoanData, !is.na(CreditScoreRangeLower))) +
+          geom_histogram(aes(color = CreditRange.bucket), stat = 'count') +
+          scale_y_sqrt() +
+          theme(legend.position = 'bottom')
+
+grid.arrange(p9, p10, p11, ncol = 1)
+```
+
+This was a cool exploratory variable to analyze.  After looking at the data set
+I recognized that all the credit scores had a range of 19, meaning for all 
+borrowers in the data set, their **'CreditScoreRangeLower'** limit was just 19 
+points from their **'CreditScoreRangeUpper'** limit. Realizing this, I thought
+it would be better to assess the data if I created a credit range bucket 
+exploratory variable I could use to filter on. After doing so, I generated the 
+above three plots. 
+
+Plot one is just a histogram distribution plot of the
+**'CreditScoreRangeLower'** limit of the data set. Plot two looks almost exactly
+like it, and it should. This is a plot of the **'CreditScoreRangeUpper'** limit,
+which is only 19 points from the lower limit, so in essence one should expect
+to see a similar distribution.  The third plot however, is an exploration of the
+**'CreditRange.bucket'** exploratory variable I created. Here, I've used a
+histogram to convey the distribution of true credit range counts within the
+data set. 
+
+### Credit Grade Plot:
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=8, fig.width=9}
+# checking the levels in the variable CreditGrade
+levels(prsprLoanData$CreditGrade)
+# generating a summary of the variable CreditGrade
+summary(prsprLoanData$CreditGrade)
+
+p12 <- ggplot(aes(x = CreditGrade), data = prsprLoanData) +
+          geom_histogram(aes(color = CreditGrade), stat = 'count') +
+          scale_y_sqrt()
+
+# plotting CreditGrade: since Credit Grade is only applicable to listings 
+# pre-2009, we are going to subset our data using the supporting exploratory
+# variable, 'ListingCreationDate'. 
+
+# Listing Creation Date is a factor variable displayed as a date, so I'll have
+# to convert it to a date first
+prsprLoanData$ListingCreationDate2 <- as.Date.character(
+                                              prsprLoanData$ListingCreationDate,
+                                              '%Y-%m-%d',
+                                              tryFormats = '%Y-%m-%d')
+
+p13 <- ggplot(aes(x = CreditGrade), 
+             data = subset(prsprLoanData, 
+                           ListingCreationDate2 < as.Date('2009-01-01'))) +
+          geom_histogram(aes(color = CreditGrade), stat = 'count') 
+
+grid.arrange(p12, p13, ncol = 1)
+```
+
+The first **'CreditGrade'** plot is just an aggregation of the factor variable
+within the data set.  Credit Grade has 9 levels,
+**' ', 'A', 'AA', 'B', 'C', 'D', 'E', 'HR', & 'NC'**. Taking a look at the
+summary output of this variable, we see that the **' '** level has the highest
+count at 84,984. I'm curious to see what classification **' '** really stands
+for. Is it missing data, or perhaps, an actual grade of credit? I'll have to dig
+a bit further to find out, we'll see. **'NC'** I believe stands for no credit,
+and this grade has a count of 141 within our data set. I'll have to confirm
+that **'NC''** means no credit, however, just to be thorough.
+
+After reviewing the text file that comes with the dataset, I was able to
+verifty that **'CreditGrade'** ratings are only applicable to listings created
+prior to 2009. Since **'CreditGrade'** is only applicable to listings pre-2009
+we are going to subset our data using the supporting exploratory
+variable, **'ListingCreationDate'** to further explore the count distribution
+within the variable **'CreditGrade'**. This manipulation is visualized within 
+the second plot. 
+
+### Borrower State Plot: 
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=7, fig.width=10}
+# generating a summary of the variable Borrower State
+summary(prsprLoanData$BorrowerState)
+# plotting loan current days delinquent
+ggplot(aes(x = BorrowerState), data = prsprLoanData) +
+  geom_histogram(aes(color = BorrowerState), stat = 'count') +
+  scale_y_sqrt() +
+  coord_flip()
+
+```
+
+This is a great plot of the **'BorrowerState'** variable.  It does a great job
+aggregating the total counts of loans per state.  Im hoping with this plot we
+can see if there are any patterns or anomolies to the distribution of loan
+counts by state within the data set. California seems to have the highest count
+of borrowers with 14,717, and North Dakota the fewest with 52. 
+
+### Listing Category Plot: 
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=5, fig.width=10}
+# generating a summary of the variable 'Listing Category'
+summary(prsprLoanData$ListingCategory..numeric.)
+# aggregating the variable(I'll attempt to make this a factor var later) 
+# by count
+table(prsprLoanData$ListingCategory..numeric.)
+# plotting the variable ListingCategory
+ggplot(aes(x = ListingCategory..numeric.), data = prsprLoanData) +
+  geom_histogram(color = 'purple', stat = 'count') +
+  scale_y_sqrt()
+
+```
+
+Based on a summary of this exploratory variable, we can see that 'debt
+consolidation' has the highest count for **'ListingCategory..numeric.'** which
+is 1 or 'Debt Consolidation'. The listing category with the fewest or smallest
+count of observations is 12 or 'Green Loans'.
+
+This is an interesting plot which I hope to explore further. The factor variable
+**'LisitingCategory..numeric.'** is currently displayed as a numeric factor
+variable. To give you a better idea of what I'm talking about, take a look; 
+listed below will be the numeric assignment of categorized variables assigned
+to the **'ListingCategory..numeric.'** factor variable based on the text file
+provided with the data set:
+
+* **0 = 'Not Available'** \           
+* **1 = 'Debt Consolidation'** \      
+* **2 = 'Home Improvement'** \        
+* **3 = 'Business'** \                
+* **4 = 'Personal Loan'** \           
+* **5 = 'Student Use'** \             
+* **6 = 'Auto'** \                    
+* **7 = 'Other'** \                   
+* **8 = 'Baby & Adoption'** \         
+* **9 = 'Boat'** \                    
+* **10 = 'Cosmetic Procedure'**      
+* **11 = 'Engagement Ring'** \
+* **12 = 'Green Loans'** \
+* **13 = 'Household Expenses'** \
+* **14 = 'Large Purchases'** \
+* **15 = 'Medical/Dental'** \
+* **16 = 'Motorcycle'** \
+* **17 = 'RV'** \
+* **18 = 'Taxes'** \
+* **19 = 'Vacation'** \
+* **20 = 'Wedding Loans'** \
+
+In my further exploration of this variable, I'd like to convert this numeric 
+factor variable into a factor variable with a bit more meaning behind it. 
+Instead of numbers as levels to identify the category, I'll reassign the 
+variable to show its true category instead of a number. This will help reading 
+plots for this variable much more discernable.
+
+I'd also like to see if any patterns within this variable exist. Are loan 
+approvals more associated with a particular listing category vs. another? We
+can dig into later. 
+
+### Further Exploration of Listing Category
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=5, fig.width=10}
+# first I'll need to convert variable 'Listing Category' to labled factor var.
+# I can do this by just creating a new variable 'ReasonForLoan'
+prsprLoanData$ReasonForLoan <- NA
+# now we assign the categorical variable to the observation 
+prsprLoanData$ReasonForLoan <- cut(prsprLoanData$ListingCategory..numeric.,
+                                   breaks = c(0:21), 
+                                   labels = c('Not Available',
+                                              'Debt Consolidation',
+                                              'Home Improvement',
+                                              'Business',
+                                              'Personal Loan',
+                                              'Student Use',
+                                              'Auto',
+                                              'Other',
+                                              'Baby&Adoption',
+                                              'Boat',
+                                              'Cosmetic Procedure',
+                                              'Engagement Ring',
+                                              'Green Loans',
+                                              'Household Expenses',
+                                              'Large Purchases',
+                                              'Medical/Dental',
+                                              'Motorcylce',
+                                              'RV',
+                                              'Taxes',
+                                              'Vacation',
+                                              'Wedding Loans'), right = FALSE)
+
+# plotting the factor variable ReasonForLoan
+ggplot(aes(x = ReasonForLoan), data = prsprLoanData) +
+  geom_histogram(aes(color = ReasonForLoan), stat = 'count') +
+  scale_y_sqrt() +
+  coord_flip()
+
+```
+
+The original data set has the variable **'ListingCategory..numeric.'** as an 
+integer, which means when plotting, you cant filter on it. This was unfortunate
+because it makes a great factor variable as it is categorical in nature, just 
+conveyed within the data set as an integer. I chose to change this. Therefore, 
+using the `cut()` function, I created a factor variable **'ReasonForLoan'**. By 
+doing so, I can now show/filter by **'ReasonForLoan'** to show a discernable 
+count of which loan reason is the most prevelent in the data set. Here we can 
+see, 'debt consolidation' is the most stated, pun intended, 'Reason for a Loan'.
+I have to say though, I've always found it odd and a bit hypocritical that 
+social convention's preferred method of getting out of debt, is taking out 
+another loan. Ehhh....
+
+### Borrower APR Plot:
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=5, fig.width=10}
+# generating a summary of the exploratory variable BorrowerAPR
+summary(prsprLoanData$BorrowerAPR)
+
+# applying the square root to 'BorrowerAPR' variable to further explore the 
+# distribution
+ggplot(aes(x = sqrt(BorrowerAPR)), data = prsprLoanData) +
+  geom_jitter(alpha = 1/20, position = position_jitter(h = 0), stat = 'count') +
+  scale_y_sqrt(limits = c(0, 1000))
+```
+
+Here we can see the distribution of **'BorrowerAPR'** rates using the scatter
+plot technique.  Based on the summary statistics generated using the `summary()`
+function, we can see a minimum **'BorrowerAPR'** rate of 0.00653% and a max of 
+0.51229%. The mean or average **'BorrowerAPR'** rate for the data set is
+0.21883%. An interesting thought,.. I wonder what the variance in distribution 
+would look like between the data set **'BorrowerAPR'** mean and say the average 
+**'BorrowerAPR'** rate for the data set grouped by **'CreditRange.bucket'**,
+the exploratory variable I created earlier? That may need to be left for future 
+explorations.
+
+### Estimated Effective Yield Plot
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=5, fig.width=10}
+# plotting exploratory variable 'Estimated Effective Yield' using y-scale sqrt()
+p14 <- ggplot(aes(x = EstimatedEffectiveYield),
+              data = subset(prsprLoanData, !is.na(EstimatedEffectiveYield))) +
+          geom_jitter(alpha = 1/5, position = position_jitter(h = 0), 
+                      stat = 'count') +
+          scale_y_sqrt()
+
+# to take a closer look at the overplotting distribution, I'll use y-scale 
+# log10()
+p15 <- p14 + scale_y_log10()
+
+grid.arrange(p14, p15, ncol = 1)
+```
+
+This plot conveys the distribution of the **'EstimatedEffectiveYield'** 
+exploratory variable using the scatter plot method. The first plot depicts a 
+bit of overplotting near the x-axis.  To further investigate this, I've added a 
+`log10()` function manipulation to the y-axis using `scale_y_log10()`. By 
+doing so, we can see in the second plot, a much clearer distribution of plot 
+points under a 1000, and also a better view at the overplotting near the x-axis.
+
+### Monthly Loan Payment Plot:
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=5, fig.width=10}
+# plot of the distribution of Prosper loanees Monthly Loan Payment
+p16 <- ggplot(aes(x = MonthlyLoanPayment), 
+              data = subset(prsprLoanData, !is.na(MonthlyLoanPayment))) +
+          geom_jitter(alpha = 1/20, stat = 'count') +
+          scale_y_log10()
+
+# creating an exploratory variable conveying the proportion of monthly loan
+# payment to the original amount of the loan
+prsprLoanData$prop_MthlyPymt <- (prsprLoanData$MonthlyLoanPayment / 
+                                   prsprLoanData$LoanOriginalAmount)
+
+p17 <- ggplot(aes(x = prop_MthlyPymt), data = prsprLoanData) +
+          geom_histogram(color = 'yellow') +
+          scale_x_continuous(limits = c(0, .25)) +
+          scale_y_sqrt()
+
+grid.arrange(p16, p17, ncol = 1)
+
+```
+
+Here we have analyzed the exploratory variable **'MonthlyLoanPayment'**. This 
+distribution of values within the data set are conveyed using the scatter plot 
+method in figure 1. We can see quite a bit of overplotting near the x-axis and 
+as the count of borrowers with the same monthly loan payment increases. 
+
+I was curious to explore the proportion of monthly loan payments to the original
+amount of the borrower's loan so I created an exploratory variable to do so. 
+The variable **'prop_MthlyPymt'** was developed by dividing the borrower's 
+monthly loan payment by their original loan amount. In figure 2, I used a 
+histogram to show the distribution of proportion monthly payments, 
+**'prop_MthlyPymt'** to convey the count of borrowers with similar proportion 
+percentages.
+
+### Loan Original Amount Plot:
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=7, fig.width=10}
+# generating a summary of the variable 'Loan Original Amount'
+summary(prsprLoanData$LoanOriginalAmount)
+# plotting the variable 'Loan Original Amount'
+p18 <- ggplot(aes(x = LoanOriginalAmount), data = prsprLoanData) +
+          geom_jitter(alpha = 1/3, stat = 'count') +
+          scale_y_log10()
+ 
+# taking the square root of LoanOriginalAmount to spread out distribution
+p19 <- ggplot(aes(x = sqrt(LoanOriginalAmount)), data = prsprLoanData) +
+          geom_jitter(color = 'red', alpha = 1/4, stat = 'count') +
+          scale_y_log10()
+
+# taking the log10 of LoanOriginalAmount to spread out distribution even further
+p20 <- ggplot(aes(x = log10(LoanOriginalAmount + 1)), data = prsprLoanData) + 
+          geom_jitter(color = 'purple', alpha = 1/4, stat = 'count') +
+          scale_y_log10()
+
+grid.arrange(p18, p19, p20, ncol = 1)
+ 
+```
+
+By plotting the variable **'Loan Original Amount'**, we are able to see
+high-level the distribution of loan amounts through out the data set. In figure
+1's plot we can see a lot of overplotting near the x-axis, where a majority of
+the observations of loan amounts carry similar values, leading to the
+overplotting. I'm hoping a further exploration of the y-axis parameters will
+show a better variance among the loan amounts. For now, running the summary
+function on the variable **'LoanOriginalAmount'** produces a minimum loan amount
+within the data set of $1,000, a mean of $8,337, a median of $6,500, and a max
+loan amount of $35,000. 
+
+After further analysis, we can see in figure 2, by taking the square root of
+the exploratory variable **'LoanOriginalAmount'** the distribution scale on the
+x-axis has shrunk from a visible limit of 30,000, to a little more than 150.
+-- To give some meaning to this, 150 squared is 22,500, just a few shy of the
+x-axis limit in figure 1.-- That being said, we can see the value distribution
+to be much more spread out. A further exploration in figure 3, shows more
+dispersion amongst the values of the exploratory variable
+**'LoanOriginalAmount'**.
+
+### Total Prosper Payments Billed Plot:
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=7, fig.width=10}
+# generating a summary of the variable 'Total Prosper Payments Billed'
+summary(prsprLoanData$TotalProsperPaymentsBilled)
+# plotting the variable 'Total Prosper Payments Billed'
+p21 <- ggplot(aes(x = TotalProsperPaymentsBilled), 
+              data = subset(prsprLoanData, 
+                            !is.na(TotalProsperPaymentsBilled))) +
+          geom_histogram(stat = 'count') +
+          scale_x_continuous(limits = c(0, 150), breaks = seq(0, 150, 25)) +
+          scale_y_sqrt()
+
+# taking the square root of Total Prosper Payments Billed
+p22 <- ggplot(aes(x = sqrt(TotalProsperPaymentsBilled)), 
+              data = subset(prsprLoanData, 
+                            !is.na(TotalProsperPaymentsBilled))) +
+          geom_line(color = 'purple', stat = 'count') +
+          scale_y_sqrt()
+
+# taking the log10() of Total Prosper Payments Billed
+p23 <- ggplot(aes(x = log10(TotalProsperPaymentsBilled + 1)), 
+              data = subset(prsprLoanData, 
+                            !is.na(TotalProsperPaymentsBilled))) +
+          geom_line(color = 'blue', stat = 'count') +
+          scale_y_sqrt()
+
+grid.arrange(p21, p22, p23, ncol = 1)
+
+# Note:
+# - not sure line plot works here as points/counts are not related
+# - I noticed that the variables 'Total Prosper Payments Billed' and 
+#   'On Time Prosper Payments' seem to be similar. In my further exploration
+#   I'll make sure to double check and see if it's a duplicate.
+
+```
+
+The variable **'TotalProsperPaymentsBilled'**, refers to the number of on time 
+payments the borrower made on Prosper loans at the time they created the loan 
+application. This value will be null if the borrower had no prior loans. By 
+running our summary function, I was able to determine that 91,852 applicants 
+had no prior loans with Prosper and where therefore categorized as NA's within
+this exploratory variable. This means that 80.6% of this data set of loanees
+did not have an existing loan with Prosper before filling out an application.
+
+It would be interesting to find out the distribution of **"BorrowerRates'** for
+applicants in this bucket, who've had no prior loan exprience with Prosper. 
+And does prior loan experience with Prosper improve an applicants chances of 
+having a better Borrower Rate ? 
+
+Taking a closer look at the exploratory variable **'TotalProsperPaymentsBilled'**
+in figure 2, I've taken the square root of **'TotalProsperPaymentsBilled'**, and 
+used a line plot to show its distribution. For figure 3, I've taken the 
+log of **'TotalProsperPaymentsBilled'**, using `log10()` to further analyze and 
+stretch the visual. 
+
+### Prosper Payments Less Than One Month Late Plot:
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=7, fig.width=10}
+# generating a summary of the variable 'Prosper Payments Less Than One Month 
+# late' 
+summary(prsprLoanData$ProsperPaymentsLessThanOneMonthLate)
+table(prsprLoanData$ProsperPaymentsLessThanOneMonthLate)
+# plotting the variable and subsetting data with late payments > 0 days
+p24 <- ggplot(aes(x = ProsperPaymentsLessThanOneMonthLate), 
+              data = subset(prsprLoanData, 
+                            ProsperPaymentsLessThanOneMonthLate > 0 &
+                            !is.na(ProsperPaymentsLessThanOneMonthLate))) +
+        geom_histogram(color = 'black', fill = I('#F79420'), stat = 'count') +
+        scale_x_continuous(limits = c(0, 45), breaks = seq(0, 45, 5)) +
+        scale_y_sqrt()
+
+# taking a look at observations where Prosper Payments are < 1 Mnth Late
+p25 <- ggplot(aes(x = ProsperPaymentsLessThanOneMonthLate), 
+              data = subset(prsprLoanData, 
+                            ProsperPaymentsLessThanOneMonthLate > 31)) +
+          geom_histogram(color = 'blue', stat = 'count') +
+          scale_x_continuous(limits = c(31,43), breaks = seq(31, 43, 1))
+
+grid.arrange(p24, p25, ncol = 1)
+
+# Note:
+# - I noticed when I ran the plot without any limits on the x/y axes, the count
+#   for 0 payments less than a month late where quite staggering, around 18000.
+#   Look at the summary and table of this variable. 
+```
+
+Here we can see a plot of the aggregated count of loanees who have payments 
+less than a month old. As you can see, this is a right-tailed distribution
+with a majority of payments less than a week old. What's really interesting 
+here is that the variable, **'ProsperPaymentsLessThanOneMonthLate'** has a
+range of 0 to 42 as their defined month. I'd be curious to see what proportion
+of loanees have late payments under a month late but beyond the socially 
+conventioned understanding of how long a calender month actually is (0 to 
+31 days).  That being said, it looks like Prosper has quite a few responsible
+customers paying on time, as the max count for payments 0 days late is 18,285.
+
+I tried zooming in on Prosper payments beyond the socially conveined paramater
+of how long a month actually is, 31 days, to get an idea of how many borrowers 
+or what ratio of borrowers might occupy this bucket. In figure 2, we can see 
+that 14 borrowers or .000634% of the populatioin have payments less than one
+month old but beyond the 31 day threshold. 
+
+### Prosper Payments One Month Plus Late:
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=5, fig.width=10}
+# generating a summary of the variable 'Prosper Payments One Mnth Plus Late'
+summary(prsprLoanData$ProsperPaymentsOneMonthPlusLate)
+table(prsprLoanData$ProsperPaymentsOneMonthPlusLate)
+# plotting the variable and subsetting data to be > 0 mths late
+ggplot(aes(x = ProsperPaymentsOneMonthPlusLate), 
+       data = subset(prsprLoanData, 
+                     ProsperPaymentsOneMonthPlusLate > 0 &
+                     !is.na(ProsperPaymentsOneMonthPlusLate))) +
+  geom_histogram(color = 'orange', stat = 'count') +
+  scale_x_continuous(limits = c(0, 22), breaks = seq(0, 22, 2)) +
+  scale_y_sqrt()
+
+# Note:
+# - I noticed when I ran the plot without any limits on the x/y axes, the count
+#   for 0 payments more than a month late where quite staggering, around 22000.
+#   Look at the summary and table of this variable. 
+```
+
+Here, the plot of variable **'ProsperPaymentsOneMonthPlusLate'** shows an
+aggregated count of loanees whose payments are more than a month late. It
+would be interesting to find out if any loanees whose payments where
+categorized as less than a month late, but fell beyond the 31 day calendar
+month threshold, are also in this ploted variable.
+
+# Univariate Analysis
+
+### What is the structure of your dataset?
+
+There are 113,937 observations in this data set with 81 variables. I chose to
+take a look at a few factor variables to get a better understanding of the
+data: **CreditGrade**, **LoanStatus**, **BorrowerState**, **EmploymentStatus**,
+**IsBorrowerHomeowner**, and **IncomeRange**. I also analyzed a few other
+variables to round out my high-level exploration of the data set.
+Here's what I found:
+
+**A summary of the entire data set:** \
+
+* **The median loan amount is $6500 **\
+* **56576 loanees have a loan status as current, 38074 have a loan status of**
+  **completed, and 5018 have defaulted.** \ 
+* **California, CA, is the state with the most number of loans within the data** 
+  **set, with 14717 observations and North Dakota, ND, with the fewest, 52** \
+* **The income range with the largest number of loanees is $25,000 - $49,999** \
+* **The listing category used most as the reason for the loan is debt** \
+  **consolidation** \
+* **Most loanees are good at paying their bill on time**
+
+### What is/are the main feature(s) of interest in your dataset?
+
+The main features of interest for me in this data set are the borrower rate, 
+prosper score, prosper payments less than one month late and prosper
+payments one month plus late. This may change as my exploration of the data 
+deepens with every new pattern or anomaly I stumble upon. It should be an 
+interesting journey,.. I'm looking forward to it. 
+
+### What other features in the dataset do you think will help support your 
+investigation into your feature(s) of interest?
+
+In support of my investigation of the variable borrower rate, I'll also 
+explore the following supportive (I hope :|) exploratory variables: 
+
+* **EmploymentStatus** \   
+* **ReasonForLoan** \
+* **IncomeRange** \
+* **LoanOriginalAmount** \
+* **ProsperScore** \      
+* **TotalProsperPaymentsBilled** \
+* **CreditGrade** \
+* **ProsperPaymentsLessThanOneMonthLate** \
+* **BorrowerState** \
+* **ProsperPaymentsOneMonthPlusLate** \
+* **BorroweAPR** \
+* **EstiatedEffectiveYield** \
+* **CreditRange.bucket** \
+* **MonthlyLoanPayment** \
+* **PropMthlyPymt** \
+
+I hope in my analysis of these features I can unconver some insightful and 
+useful ideas to help improving my own situation outside of the obvious known
+influencers of borrower rate. 
+
+### Did you create any new variables from existing variables in the dataset?
+
+In order to thoroughly assess this data set, and appease my curiosity, I had 
+conduct a few manipulations in order to answer a few intial questions I had
+about the data. The following variables were created during my exploration: 
+
+**Parent Feature: Loan Status** \
+**Exploratory Variable Created:** \
+    * **'borrower_rate_mean'** \
+    * **'borrower_rate_max'** \
+    * **'borrower_rate_median'** \
+    * **'mnthly_income_mean'** \
+    * **'borrower_rate_min'** \
+    * **'n() = count'** \
+
+Here I created 6 variables within a data frame by grouping the data by Loan
+Status using the `group_by()` function. This generated some basic statistics
+about the data set grouped by the Loan Status levels. My exploration of some
+of these exploratory variables can be found above in the Univariate Plot 
+section of this report.
+
+**Parent Feature: Employment Status** \
+**Exploratory Variable Created:** \
+    * **'borrower_rate_mean'** \
+    * **'mnthly_inc_mean'** \
+    * **'list_cat_median'** \
+    * **'n() = count'** \
+    
+I created 4 variables within a data frame by grouping the data set by 
+employment status using the `group_by()` function. I didn't get a chance to 
+explore these features very much so maybe at a future date. 
+
+**Parent Feature: Credit Score Range Lower & Upper** \
+**Exploratory Variable Created:** \
+    * **'CreditRange.bucket'** \
+    
+In this analysis, I created one exploratory factor variable within the data 
+set itself, which will make my journey even more fun because now I can filter
+my data by a true credit range. My visualization of this exploratory variable
+only produced counts of borrowers within a particular range. Hopefully when I
+get to the multivariate plot section, I can see what filtering by this bucket
+range really looks like.
+
+**Parent Feature: Monthly Loan Payment** \
+**Exploratory Variable Created:** \
+    * **'prop_MthlyPymt'** \
+    
+Creating the proportion of monthly loan payment to original loan amount 
+(**'MonthlyLoanPayment' / 'LoanOriginalAmount'**) variable helped me understand
+the percentage borrowers loan payments were to the amount they borrowed. If I 
+have the time, it would be interesting to see the borrowers with the top 90%
+of **'prop_MthlyPymnt'** percentages and compare their borrower rates, aprs, and 
+any other interesting factors. Maybe generating a scatter plot matrix of these
+variables might help me in understanding their relationships with one another 
+and if any correlation exists.
+
+**Parent Feature: Credit Grade** \
+**Exploratory Variable Created:** \
+    * **'ListingCreationDate2'** \
+    
+Since **'CreditGrade'** is only applicable to listings pre-2009, I needed to 
+subset the data using a supportive exploratory variable,
+**'ListingCreationDate'**. Currently in the original data set, 
+**'ListingCreationDate'** is a factor variable so I'll need to convert it to a
+date before subsetting my data. After doing this, the visualization shows a 
+much clearer depiction in variance of the credit grades. 
+
+### Of the features you investigated, were there any unusual distributions? 
+
+There weren't really any unusual distributions within the univariate plots 
+visualized above. There were a few with overplotting, but that could be 
+handled with setting your 'alpha', and 'jitter' parameters mainly. 
+
+### Did you perform any operations on the data to tidy, adjust, or change the  
+form of the data? If so, why did you do this?
+
+When trying to visualize some plots, I found it useful to manipulate the 
+x-axis by adding layers, in particular, the `scale_x_continuous()`, 
+`scale_x_sqrt()` and `scale_x_log10()`. On some occassions I even applied 
+using these same functions to the exploratory variable itself, wrapped within 
+the ggplot aesthetic 'x = ', to further manipulate and zoom in on busy data. 
+
+In order to truly convey the entire picture with regards to visualizing the 
+data, I had to adjust my y-axis on quite a few plots to account for the variance 
+in count. Specifically, I had to use `scale_y_sqrt()`, `scale_y_continuous()` 
+and lastly the function `scale_y_log10()`. 
+
+*******************************************************************************
+
+# Bivariate Plots Section
+
+Bivariate analysis compares two features or exploratory variables from the 
+chosen data set and visualizes their relationship to one another. Here I'll be 
+looking to explore many relationships based on some patterns and anomalies I've
+noticed during my univariate exploration of the data set. In order to truly 
+get the best out of my analysis, and avoid flying blind, I'm going to use the
+`ggpairs()` function to group sets of features together to explore their 
+correlation with one another and other variables specified in the comparison.
+
+`ggpairs()` does a great job of conveying the correlation coefficient between
+two variables, or the positive or negative effect one variable has on the other.
+Let's group some exploratory variables together and plot them to see which
+relationships we should explore further. Before I do that however, considering
+the size of this data set, I'm going to set the seed of my random sample 
+generated by using the function `set.seed()`. This will help with reproducible
+results but more importantly, a sample of the population data allows for more 
+efficient and quicker analysis without taking up too much computer resources. 
+In this section, you will often see  **... data = prsprLoanData_smpl**; this 
+is the sample data set of 30,000 observations that was created to analyze and 
+explore variables and their relationships.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=10, fig.width=10}
+# setting my seed, so as to have reproducible results
+set.seed(21361309)
+# creating a sample set of Prosper Loan Data to run a matrix plot using ggpairs
+prsprLoanData_smpl <- prsprLoanData[sample(1:length(prsprLoanData$BorrowerRate),
+                                           30000), ]
+
+# creating variables for my correlation plots to arrange later
+p26 <- ggpairs(prsprLoanData_smpl, columns = c(4:6, 9, 16:17),
+            lower = list(continuous = wrap('points', shape = I('.'))),
+            upper = list(combo = wrap('box', outlier.shape = I('.'))))
+p26
+p27 <- ggpairs(prsprLoanData_smpl, columns = c(21, 52:56),
+              lower = list(continuous = wrap('points', shape = I('.'))),
+              upper = list(combo = wrap('box', outlier.shape = I('.'))))
+p27
+p28 <- ggpairs(prsprLoanData_smpl, columns = c(60, 62, 64, 68),
+              lower = list(continuous = wrap('points', shape = I('.'))),
+              upper = list(combo = wrap('box', outlier.shape = I('.'))))
+p28
+p29 <- ggpairs(prsprLoanData_smpl, columns = c(9, 11:13, 26:27, 64, 68),
+               lower = list(continuous = wrap('points', shape = I('.'))),
+               upper = list(combo = wrap('box', outlier.shape = I('.'))))
+p29
+```
+
+### Borrower Rate vs. Loan Original Amount
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=8, fig.width=10}
+# generating summary stats for both exploratory variables
+summary(prsprLoanData_smpl$BorrowerRate)
+summary(prsprLoanData_smpl$LoanOriginalAmount)
+
+# checking the correlation coefficient btwn Borrower Rate vs. Orig. Loan Amount
+with(prsprLoanData_smpl, cor.test(BorrowerRate, LoanOriginalAmount), 
+     method = 'pearson')
+
+# plotting Borrower Rate vs Loan Original Amount
+p30 <- ggplot(aes(x = BorrowerRate, y = LoanOriginalAmount), 
+              data = prsprLoanData_smpl) +
+          geom_point(alpha = 1/13, position = position_jitter(h = 0), 
+                     color = 'orange') +
+          scale_x_continuous(limits = c(0, .50), breaks = seq(0, .50, .05)) +
+          coord_trans(y = 'sqrt') +
+          xlab('Borrower Rate') +
+          ylab('Original Loan Amount')
+
+# plotting the square root of Borrower Rate to further explore distribution
+p31 <- ggplot(aes(x = sqrt(BorrowerRate), y = LoanOriginalAmount), 
+              data = prsprLoanData_smpl) +
+          geom_jitter(alpha = 1/20, position = position_jitter(h = 0),
+                      color = 'purple') +
+          scale_y_sqrt()
+
+# plotting the log10() of Borrower Rate to further explore distribution
+p32 <- ggplot(aes(x = log10(BorrowerRate + 1), y = LoanOriginalAmount),
+              data = prsprLoanData_smpl) + 
+          geom_jitter(alpha = 1/20, position = position_jitter(h = 0),
+                      color = 'blue') +
+        scale_y_sqrt()
+
+grid.arrange(p30, p31, p32, ncol = 1)
+
+```
+
+Here we can see that the exploratory variables **'BorrowerRate'** and
+**'LoanOriginalAmount'** are not very correlated, as Pearson's Correlation
+Coefficient shows a -.3322 relationship between the two. 
+
+When visualizing this relationship, I chose to use the scatter plot method, but
+if you notice in figure 1, there is quite a bit of overplotting. In subsequent
+plots, figures 2 & 3, I chose to use the `sqrt()` and `log10()` functions, 
+respectively, on the ggplot 'x' variable, **'BorrowerRate'**. I was hoping by 
+taking this approach, I might be able to better see the distribution within the
+relationship, but not by much. I see a bit more linear overplotting as I 
+further manipulate the 'x' variable but thats about it. This is to be expected
+however, as the Pearson's correlated coefficient is -.3322, which isn't very
+favorable. 
+
+### Employment Status Duration vs. Total Prosper Payments Billed
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=7, fig.width=10}
+# generating summary stats for both exploratory variables
+summary(prsprLoanData_smpl$BorrowerRate)
+summary(prsprLoanData_smpl$LoanOriginalAmount)
+
+# checking the correlation coefficient between these exploratory variables
+with(prsprLoanData_smpl, cor.test(EmploymentStatusDuration,
+                                  TotalProsperPaymentsBilled), 
+     method = 'pearson')
+
+# plotting Emp.StatusDuration vs. TotalProsperPaymentsBilled
+p33 <- ggplot(aes(x = EmploymentStatusDuration, y = TotalProsperPaymentsBilled),
+              data = prsprLoanData_smpl) + 
+          geom_point(alpha = 1/5) +
+          geom_smooth(method = 'lm', color = 'red')
+
+# plotting the square root of Emp.StatusDuration to further explore distribution
+p34 <- ggplot(aes(x = sqrt(EmploymentStatusDuration), 
+                  y = TotalProsperPaymentsBilled),
+              data = prsprLoanData_smpl) + 
+          geom_jitter(alpha = 1/5, color = 'red', 
+                      position = position_jitter(h = 0)) +
+          geom_smooth(method = 'lm', color = 'blue')
+
+# plotting the log10() of Emp.StatusDuration to further explore distribution
+p35 <- ggplot(aes(x = log10(EmploymentStatusDuration + 1),
+              y = TotalProsperPaymentsBilled), data = prsprLoanData_smpl) +
+          geom_jitter(alpha = 1/5, color = 'blue', 
+                      position = position_jitter(h = 0)) +
+          geom_smooth(method = 'lm', color = 'red')
+
+grid.arrange(p33, p34, p35, ncol = 1)
+ 
+```
+
+Just a side note but I found it much more effective using a scatter plot to 
+interpret vector style feature data, especially when trying to visualize the 
+relationship. Here, we can see based on Pearson's correlated coefficient, .0543
+that these two variables, **'EmploymentStatusDuration'** and
+**'TotalProsperPaymentsBilled'** are not very correlated with one another. 
+
+Taking a further look at the relationship, I applied the `sqrt()` and `log10()`
+functions to the 'x' variable, **'EmploymentStatusDuration'** to get a better 
+view of the distribution of values. 
+
+### Borrower Rate vs. Loan Status
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=8, fig.width=10}
+# checking the correlation between these two exploratory variables
+with(prsprLoanData_smpl, cor.test(BorrowerRate, (as.numeric(LoanStatus))),
+     method = 'pearson')
+
+# using the grouped data frame by loan status created earlier
+lnStats_by_LoanSts
+
+p36 <- ggplot(aes(x = BorrowerRate), data = subset(prsprLoanData_smpl, 
+                                                   !is.na(LoanStatus))) +
+          scale_x_continuous(limits = c(0, 0.50), breaks = seq(0, 0.5, 0.05)) +
+          scale_y_log10() +
+          geom_histogram(aes(color = LoanStatus))
+
+# using an exploratory variable from the grouped data frame by loan status 
+# created earlier 'lnStats_by_LoanSts'
+
+# Loan Status vs. Borrower Rate Mean
+p37 <- ggplot(aes(x = LoanStatus, y = borrower_rate_mean), 
+              data = lnStats_by_LoanSts) +
+          geom_point(aes(color = LoanStatus)) +
+          coord_flip()
+
+grid.arrange(p36, p37, ncol = 1)
+```
+
+Ok, these are two interesting plots.  I chose a histogram to convey the 
+relationship between these variables because one of them is a factor variable, 
+or categorical variable which holds no identified numeric value. So when 
+comparing quantitative variables with qualitative ones, I realized I'd have to
+use the categorical variable as a filter, in order to compare them. 
+
+Because I have chosen to compare quantitative vs. qualitative variables, 
+generating a basic statistical test, like Pearson's coefficient, just isn't
+possible, unless I use the `as.numeric()` function in R, which assigns integers
+to the categorical levels of an exploratory variable. If we do this, then we 
+can assess Pearson's coefficient between these variables, making sure to 
+correctly match positive correlations with the assigned category level. 
+
+Here, in figure 1, I chose to use '**LoanStatus'** as a filter, and generate
+counts of **'BorrowerRate'** by **'LoanStatus'** category. From the
+visualization, we can see that **'CharegedOff'** and **'Completed'** loan
+status' have the largest counts. 
+
+In figure 2, I chose to convey borrower rate means, (an exploratory variable 
+created earlier in my analysis), by **'LoanStatus'** level. This is a much
+clearer and easier plot to understand. Here we have a point plot displaying the
+mean borrower rates for each category of **'LoanStatus'**. It looks like the
+level **'Past Due (>120 days)'** has the highest borrower rate mean of all the
+groups at more than 0.26%. 
+
+### Employment Status vs. Borrower Rate
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=8, fig.width=10}
+# taking a summary of the data set grouped by Employment Status
+by(prsprLoanData$BorrowerRate, prsprLoanData$EmploymentStatus, summary)
+
+# plotting the exploratory varibles Employment Status vs. Borrower Rate
+p38 <- ggplot(aes(x = EmploymentStatus, y = BorrowerRate), 
+              data = prsprLoanData_smpl) +
+          geom_boxplot(aes(color = EmploymentStatus))
+
+# taking a closer look at the distribution of borrower rates for the category 
+# 'Not employed'
+p39 <- ggplot(aes(x = BorrowerRate), 
+              data = subset(prsprLoanData_smpl, 
+                            EmploymentStatus == 'Not employed')) +
+          geom_histogram(color = 'purple') +
+          scale_y_sqrt()
+
+grid.arrange(p38, p39, ncol = 1) 
+```
+
+In this exploration of **'BorrowerRate'** vs. **'EmploymentStatus'** I've run
+the summary function using the `by()` method, in order to summarize
+**'BorrowerRate'** statistics by **'EmploymentStatus'** level. 
+
+To switch it up a bit, in figure 1, I chose to use the box plot method to convey
+the relationship between these two exploratory variables. Again, I've chosen a 
+quantitative variable in **'BorrowerRate'** and comparing it with a qualitative 
+variable in **'EmploymentStatus'**, so using Pearson's correlation coefficient
+to determine correlation can only be done if I convert the factor variable, 
+**'EmploymentStatus'** to an integer using `as.numeric()`; I hope in my future 
+explorations of these variables I can uncover some useful insights. 
+
+As for the box plot however, we can see a clear and distinct distribution of
+the min, max and mean borrower rates for each level of **'EmploymentStatus'**. 
+For figure 2, I chose to take a closer look at employment status
+**'Not employed'**. Here, with the use of the histogram plot, I've been able to
+convey the distribution of borrower rate counts within the 'Not Employed' group. 
+
+### Borrower Rate vs. Income Range
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=8, fig.width=10}
+# generating some summary statistics of these exploratory variables
+summary(prsprLoanData_smpl$BorrowerRate)
+summary(prsprLoanData_smpl$IncomeRange)
+
+# generating some basic statistics regarding correlation coefficient using 
+# Pearson's method
+with(prsprLoanData_smpl, cor.test(BorrowerRate, (as.numeric(IncomeRange)), 
+     method = 'pearson'))
+
+# plotting borrower rate vs. income range, using income range as a filter
+# and facetting by inc range
+p40 <- ggplot(aes(x = BorrowerRate), data = prsprLoanData_smpl) +
+          geom_histogram(aes(color = IncomeRange)) +
+          facet_wrap(~IncomeRange) +
+          scale_y_sqrt()
+
+# plotting the traditional comparison using x,y for both exploratory variables
+p41 <- ggplot(aes(x = IncomeRange, y = BorrowerRate), 
+              data = prsprLoanData_smpl) +
+          geom_boxplot(aes(color = IncomeRange))
+
+grid.arrange(p40, p41, ncol = 1) 
+```
+
+I've been waiting for the opportunity to really leverage the technique of 
+facet wrapping using the `facet_wrap()` method. And I really like it :). Here
+we can see using this technique, I've been able to visualize the distribution 
+of borrower rates within each level of **'Income Range'**. This really helps
+when comparing the distributions among levels because you can see each level's 
+dispersion of the data. Just from a glance we can see that income ranges 
+$25,000 - $49,999 and $50,000 - $74,999 have the largest counts for borrower 
+rates between 0.05 - .35. 
+
+In figure two, I chose a traditional method in conveying the relationship of 
+borrower rates amongst income range levels using the box plot method as before.
+At a quick glance, we see the **'IncomeRange'** with the lowest
+**'BorrowerRate'** mean seems to be income range $100,000+. I wonder why that
+might be? It would cool to compare credit score ranges of these borrowers using
+the **'CreditRange.bucket'** exploratory variable I created earlier. 
+
+And lastly after running a basic statistical test between these quantitative and 
+qualitative/categorical variables, we can see there isn't too much correlation
+between them, -0.156. Instead of looking at income ranges, let's explore another 
+supporting variable which is quantitative in nature, and a bit more specific 
+when describing income. That variable is **'StatedMonthlyIncome'**.
+
+### Borrower Rate vs. Stated Monthly Income
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=7, fig.width=10}
+# generating some summary statistics of these exploratory variables
+summary(prsprLoanData_smpl$BorrowerRate)
+summary(prsprLoanData_smpl$StatedMonthlyIncome)
+
+# generating some basic statistics regarding correlation coefficient using 
+# Pearson's method
+with(prsprLoanData_smpl, cor.test(BorrowerRate, StatedMonthlyIncome),
+     method = 'pearson')
+
+# cuberoot transformation
+cuberoot_trans = function() trans_new('cuberoot', 
+                                      transform = function(x) x^(1/3),
+                                      inverse = function(x) x^3)
+
+# plotting qualitative & quantitative variables, filtering by qual var
+ggplot(aes(x = BorrowerRate, y = StatedMonthlyIncome), 
+       data = subset(prsprLoanData_smpl, !is.na(StatedMonthlyIncome))) +
+  scale_x_continuous(limits = c(0.05, 0.4), breaks = seq(0.05, 0.4, 0.05)) +
+  scale_y_continuous(trans = log10_trans(), limits = c(1, 200000),
+                     breaks = seq(1, 200000, 50000)) +
+  geom_boxplot(aes(color = IncomeRange))
+
+```
+
+As you can see,this box plot shows the variance of borrower rates based on the 
+stated income of the loanee, which happens to fall into a certain income range. 
+I do notice a few things that might raise a couple more questions however:
+The categories 'Not displayed' and 'Not employed' are on opposite sides of the
+spectrum. 'Not employed' borrowers seem to have the lowest borrower rates at 
+less than 0.10%, which seems a bit odd. I may have to look into this further.
+I wonder if this may be due to a tax credit or something?
+
+However, 'Not displayed' borrowers seem to have the highest borrower rates, at 
+more that 0.3% which seems logical from the perspective of Prosper, who has to 
+assume the risk of loaning out the money. It makes sense for them to assign a 
+higher borrower rate, if the borrowers stated monthly income is not verifiable.
+
+What really stands out to me though are the income ranges between $50,000 and 
+$99,999: I would have expected their plots to include outliers within their 
+income range, conveyed as points in the upper limits of
+**'StatedMonthlyIncome'**. What I also find to be peculiar is that income range
+$100,000+ has point values plotted in and under the range of $50,000, which
+seems strange. I'll have to check on that also. 
+
+### Listing Category vs. Borrower State
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.width=11, fig.height=11}
+# generating some summary statistics of these exploratory variables
+summary(prsprLoanData_smpl$ListingCategory..numeric.)
+summary(prsprLoanData_smpl$BorrowerState)
+
+# plotting the exploratory variables
+p42 <- ggplot(aes(x = BorrowerState), data = prsprLoanData_smpl) +
+          geom_histogram(stat = 'count', aes(color = ReasonForLoan)) +
+          scale_y_sqrt() +
+          theme(legend.position = 'top')
+
+# a different look at Listing Category(Reason for Loan) vs. Borrower State
+p43 <- ggplot(aes(x = ReasonForLoan, y = BorrowerState), 
+              data = prsprLoanData_smpl) +
+          geom_point(aes(color = BorrowerState)) +
+          coord_flip() 
+
+grid.arrange(p42, p43, ncol = 1) 
+```
+
+This is the first plot, I think, where I've compared two categorical or 
+qualitative variables together. I'm quite pleased with the plot to be honest, 
+because I wasn't sure what to expect. 
+
+In figure 1, we can see **'BorrowerState'** is set as the x-axis parameter and
+visualized within a histogram. By filtering on **'ReasonForLoan'**, I was able
+to convey reason for loan counts by state. Figure 2 is an interesting plot
+because I chose to use **'BorrowerState'** as the y-axis parameter, which is a
+categorical variable. This approach produced a point plot, indicating which
+state has at least one count of a particular **'ReasonForLoan'**. And yes, I
+recognize the plot itself, shows **'BorrowerState'** on the x-axis, but I had
+to flip the visualization in order for the **'ReasonForLoan'** labels to show
+clearly; I wasn't too worried about the **'BorrowerState'** labels because a
+legend is provided for that. 
+
+### Average Borrower Rate Per Listing Category
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=7, fig.width=10}
+# using the `by()` function to group data by Listing Category(ReasonForLoan)
+by(prsprLoanData_smpl$BorrowerRate, prsprLoanData_smpl$ReasonForLoan, 
+   summary)
+
+# plotting the exploratory variables
+ggplot(aes(x = ReasonForLoan, y = BorrowerRate), data = prsprLoanData_smpl) +
+  geom_histogram(aes(color = ReasonForLoan), stat = 'summary', fun.y = mean) +
+  theme(legend.position = 'top') +
+  coord_flip()
+  
+```
+
+I'm starting to sense a pattern here,... It seems I like to compare quantitative
+variables vs. qualitative ones, with an emphasis on filtering on the 
+quantitative/categorical variable or feature. Here, I've chosen to compare
+**'BorrowerRate'** vs. **'ReasonForLoan'**, but with a little twist. By using
+the **'stat = summary'** and **'fun.y = mean'** parameters within the 
+`geom_histogram()` layer of the plot, I've been able to summarize borrower rate 
+averages for each level of **'ReasonForLoan'**. The figure here depicts 
+'Cosmetic Procedure' as the **'ReasonForLoan'** with the highest average 
+borrower rate. 'Boat' is the **'ReasonForLoan'** with the lowest borrower rate 
+average. 
+
+### Average Borrower Rate Per State
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=9, fig.width=10}
+
+# getting a summary of the Borrower Rate stats by state
+by(prsprLoanData_smpl$BorrowerRate, prsprLoanData_smpl$BorrowerState,
+   summary)
+
+# plotting the average borrower rates by state
+ggplot(aes(x = BorrowerState, y = BorrowerRate), data = prsprLoanData_smpl) +
+  geom_boxplot(aes(color = BorrowerState)) +
+  stat_summary(fun.y = mean) +
+  scale_y_sqrt(limits = c(0, 0.5), breaks = seq(0, 0.5, 0.05)) +
+  coord_flip()
+
+```
+
+I really like this plot. It's probably because of the pretty cool colors it 
+uses but I also think it's quite informative at high level glance. I've chosen
+to compare **'BorrowerRate'** vs. **'BorrowerState'** by visualizing their 
+relationship using the box plot technique. Because we have multiple borrowers 
+from each state, in order to get the average **'BorrowerRate'**, I had to add a 
+layer to the plot using the `stat_summary()` function and pass it the parameter
+of **fun.y = mean**. The result, is this beautiful visualization, which conveys
+Iowa, IA, as having the lowest **'BorrowerRate'** amongst the states at around 
+0.15% and Arkansas with the highest **'BorrowerRate'** amongst the states at 
+around 0.22%. 
+
+### Employment Status Duration vs. On Time Prosper Payments
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=5, fig.width=10}
+# generating some basic statistics regarding correlation coefficient using 
+# Pearson's method
+with(prsprLoanData_smpl, cor.test(EmploymentStatusDuration,
+                                  OnTimeProsperPayments), method = 'pearson')
+
+# plotting my pair of quantitative variables
+ggplot(aes(x = EmploymentStatusDuration, y = OnTimeProsperPayments), 
+       data = subset(prsprLoanData_smpl, !is.na(EmploymentStatusDuration))) +
+  geom_jitter(alpha = 1/11, position = position_jitter(h=0)) +
+  scale_x_log10() +
+  geom_smooth(color = 'red')
+```
+
+Based on Pearson's correlated coefficient model, it seems as though the two 
+quantitative variables I chose to compare, **'EmploymentStatusDuration'** and 
+**'OnTimeProsperPayments'** are not very correlated, with just a 0.055 or 5.5% 
+Pearson's coefficient. That being said, it didn't stop me from attempting to 
+view their relationship via a visualization. 
+
+In this plot, we can see there is quite a bit of overplotting near the x-axis. 
+To get a better view of the dispersion of values, I chose to add the 
+`scale_x_log10()` function to plot, as well as the `geom_smooth()` function
+which adds a linear model to our visualization conveying the mean value 
+throughout the distribution. 
+
+### On Time Prosper Payments vs. Total Prosper Loans
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=5, fig.width=10}
+# running summary stats for both exploratory variables
+summary(prsprLoanData_smpl$OnTimeProsperPayments)
+
+summary(prsprLoanData_smpl$TotalProsperLoans)
+
+# generating an aggregation count for Total Prosper Loans
+table(prsprLoanData_smpl$TotalProsperLoans)
+
+# running the pearson correlation coefficient statistic
+with(prsprLoanData_smpl, cor.test(OnTimeProsperPayments,
+                                  TotalProsperLoans), method = 'pearson')
+
+# plotting the exploratory variables
+ggplot(aes(x = TotalProsperLoans, y = OnTimeProsperPayments), 
+       data = subset(prsprLoanData_smpl, !is.na(TotalProsperLoans))) +
+  geom_point(alpha = 1/10, color = 'blue')
+
+```
+
+Here's a relationship worth exploring a little further: 
+**'OnTimeProsperPayments'** vs. **'TotalProsperLoans'**. Running Pearson's
+correlated coefficient, we get a .695 coefficient, or 69.5% correlated to one
+another. Our ggpairs scatter plot matrix visualization eluded us to this
+relationship, and our further analysis confirms.  
+
+We can see here that based on these two variables' relationship,
+**'OnTimeProsperPayments'** decrease as **'TotalProsperLoans'**, (which is the
+number of Prosper loans the borrower has at the time this particular loan
+application was created), increases. This is conveyed by the lack of
+overplotting for **'OnTimeProsperPayment'** amounts as **'TotalProsperLoans'**
+increases in count. When we take a look at the table statistics run, this is
+confirmed as we see **'TotalProsperLoans'** counts and their aggregated borrower
+count: 
+
+[ 1    2    3    4    5    6    7 ] \
+4160 1173  368  111   25    8    3 
+
+### Monthly Loan Payment vs. Loan Original Amount
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=7, fig.width=10}
+# running the pearson correlation coefficient statistic
+with(prsprLoanData_smpl, cor.test(MonthlyLoanPayment, LoanOriginalAmount),
+     method = 'pearson')
+
+# running summary stats for both exploratory variables
+summary(prsprLoanData_smpl$MonthlyLoanPayment)
+
+summary(prsprLoanData_smpl$LoanOriginalAmount)
+
+p44 <- ggplot(aes(x = MonthlyLoanPayment, y = LoanOriginalAmount), 
+              data = subset(prsprLoanData_smpl, !is.na(MonthlyLoanPayment))) +
+          geom_jitter(alpha = 1/20, position = position_jitter(h=0),
+                      color = 'red') +
+          scale_x_continuous(limits = c(0, 2000), breaks = seq(0, 2000, 100)) +
+          scale_y_continuous(limits = c(0, 40000), 
+                             breaks = seq(0, 40000, 5000)) + 
+          geom_smooth(method = 'lm', color = 'blue')
+
+# adding a log10() scale to the x-axis to further explore distribution
+p45 <- p44 + scale_x_log10()
+
+grid.arrange(p44, p45, ncol = 1)
+```
+
+Now this is quite interesting... After running Pearson's correlation 
+coefficient, we see that the borrower's **'MonthlyLoanPayment'** is highly 
+correlated with the borrower's **'LoanOriginalAmount'**, at .934 or 93%, which
+is to be expected. You could use either variable as an exploratory predictor 
+for the other based on the 93% confidence coefficient from Pearson's statistical
+test. 
+
+At first glance, these variables seem almost linear in nature; one could be 
+easily fooled by this. As there is quite a correlated relationship between 
+these two variables, variance does exist if the variables are explored a bit 
+deeper. By adding the `scale_x_log10()` function to our plot, the
+**'MonthlyLoanPayment'** variable, we can see that the distribution is actually
+slightly parabolic in nature. Even so, as we fit the visualization with a linear
+model, we can see the relationship truly is almost as close to linear as you
+can get. 
+
+### Borrower Rate vs. Estimated Loss
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=6, fig.width=10}
+# running pearson's correlated coefficient to view relationship
+with(prsprLoanData_smpl, cor.test(BorrowerRate, EstimatedLoss),
+     method = 'pearson')
+
+# running summary stats for both exploratory variables
+summary(prsprLoanData_smpl$BorrowerRate)
+
+summary(prsprLoanData_smpl$EstimatedLoss)
+
+# plotting exploratory variables
+ggplot(aes(x = BorrowerRate, y = EstimatedLoss),
+       data = subset(prsprLoanData_smpl, !is.na(EstimatedLoss))) +
+  geom_point(alpha = 1/10) +
+  scale_x_sqrt() +
+  geom_smooth(method = 'lm', color = 'red')
+
+```
+
+With a .945 or 94.5% correlation between **'BorrowerRate'** and
+**'EstimatedLoss'** I would expect an almost linear relationship when
+visualized. Im not exactly sure how **'BorrowerRate'** is used to calculate
+**'EstimatedLoss'** or vise versa but we see here the two are highly correlated
+with one another, and either can be used with other variables to predict the
+other. 
+
+### Estimated Return vs. Loan Original Amount
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=7, fig.width=10}
+# running pearson's correlated coefficient to view relationship
+with(prsprLoanData_smpl, cor.test(EstimatedReturn, LoanOriginalAmount),
+     method = 'pearson')
+
+# running summary stats for both exploratory variables
+summary(prsprLoanData_smpl$EstimatedReturn)
+
+summary(prsprLoanData_smpl$LoanOriginalAmount)
+
+# plotting the exploratory variables
+p46 <- ggplot(aes(x = LoanOriginalAmount, y = EstimatedReturn), 
+              data = subset(prsprLoanData_smpl, !is.na(EstimatedReturn))) +
+          geom_line(stat = 'summary', fun.y = mean) +
+          scale_x_sqrt()
+
+p47 <- p46 + geom_smooth()
+
+# changing the binning default method to adjust scale of plot (50)
+p48 <- ggplot(aes(x = 50 * round(LoanOriginalAmount / 50),
+                  y = EstimatedReturn), 
+              data = subset(prsprLoanData_smpl, !is.na(EstimatedReturn))) +
+          geom_line(stat = 'summary', fun.y = mean) +
+          scale_x_sqrt()
+
+p49 <- p48 + geom_smooth()
+
+# changing the binning default method to adjust scale of plot (150)
+p50 <- ggplot(aes(x = 150 * round(LoanOriginalAmount / 150),
+                  y = EstimatedReturn), 
+              data = subset(prsprLoanData_smpl, !is.na(EstimatedReturn))) +
+          geom_line(stat = 'summary', fun.y = mean) +
+          scale_x_sqrt()
+
+p51 <- p50 + geom_smooth()
+
+# changing the binning default method to adjust scale of plot (275)
+p52 <- ggplot(aes(x = 275 * round(LoanOriginalAmount / 275), 
+                  y = EstimatedReturn), 
+              data = subset(prsprLoanData_smpl, !is.na(EstimatedReturn))) +
+          geom_line(stat = 'summary', fun.y = mean) +
+          scale_x_sqrt()
+
+p53 <- p52 + geom_smooth()
+
+# changing the binning default method to adjust scale of plot (500)
+p54 <- ggplot(aes(x = 500 * round(LoanOriginalAmount / 500), 
+                  y = EstimatedReturn), 
+              data = subset(prsprLoanData_smpl, !is.na(EstimatedReturn))) +
+          geom_line(stat = 'summary', fun.y = mean) +
+          scale_x_sqrt()
+
+p55 <- ggplot(aes(x = 500 * round(LoanOriginalAmount / 500), 
+                  y = EstimatedReturn),
+              data = subset(prsprLoanData_smpl, !is.na(EstimatedReturn))) +
+          geom_smooth(color = 'red')
+
+grid.arrange(p46, p47, p48, p49, p50, p51, p52, p53, p54, p55, ncol = 2)
+```
+
+This was an awesome bivariate exploration for me. I say this because at first
+visualization, the data was so busy its hard to discern any pattern. By adding
+a `geom_smooth()` layer, I could get a sense of the mean of the data, which 
+looks pretty steady around .1 % **'EstimatedReturn'**, (1st pair of plots)
+but that still didnt convey any smooth change in variance within the data. 
+To account for this, I chose to divide the **'LoanOriginalAmount'** by various 
+random bincounts and then round that number to the nearest whole number, then
+multiply by the same bincount so as to produce the original whole number value.
+With 5 iterations of the original plot, by adjusting the default binning count
+I've been able to convey the data in a much smoother, more discernable format 
+in terms of recognizing trends within the data set. 
+
+### Estimated Loss vs. Estimated Return 
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=5, fig.width=10}
+# running pearson's correlated coefficient to view relationship
+with(prsprLoanData_smpl, cor.test(EstimatedLoss, EstimatedReturn),
+     method = 'pearson')
+
+# running summary stats for both exploratory variables
+summary(prsprLoanData_smpl$EstimatedLoss)
+
+summary(prsprLoanData_smpl$EstimatedReturn)
+
+# plotting the exploratory variables
+p56 <- ggplot(aes(x = EstimatedLoss, y = EstimatedReturn),
+              data = subset(prsprLoanData_smpl, !is.na(EstimatedLoss) & 
+                            !is.na(EstimatedReturn))) +
+          geom_point(fill = I('#F79420'), color = I('black'), shape = 21) +
+          scale_x_sqrt(limits = c(0, .4), breaks = seq(0, .4, .05)) +
+          geom_smooth()
+
+
+# removing the top 1% of values from the data set
+p57 <- ggplot(aes(x = EstimatedLoss, y = EstimatedReturn), 
+              data = prsprLoanData_smpl) +
+          geom_point(fill = I('#F79420'), color = I('black'), shape = 21) +
+          scale_x_continuous(lim = c(0, 
+                                     quantile(prsprLoanData_smpl$EstimatedLoss,
+                                              .99, na.rm = TRUE))) +
+          scale_y_continuous(lim = c(0, 
+                                     quantile(prsprLoanData_smpl$EstimatedReturn,
+                                              .99, na.rm = TRUE))) +
+          geom_smooth()
+
+grid.arrange(p56, p57, ncol = 1)
+```
+
+Pearson's correlation coefficient shows a relationship between these two 
+variables at .592 or 59.2%. In the grand scheme of things, when searching for 
+correlated variables to use as predictors, a 60% correlation is just not 
+strong enough to use as a predictor. To show the distribution of the plot,
+I chose to omit the top 1% of values from the data set. Here we can see a 
+scatter plot distribution of **'EstimatedLoss'** vs. **'EstimatedReturn'**.
+
+### Proportion of Monthly Payment vs. Loan Original amount
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# running summary stats for both exploratory variables
+summary(prsprLoanData_smpl$LoanOriginalAmount)
+
+# checking the correlation coefficient
+with(prsprLoanData_smpl, cor.test(prop_MthlyPymt, LoanOriginalAmount,
+                                  method = 'pearson'))
+
+# changing the binning default method to adjust scale of plot (.00055). 
+# binning choice dependent upon exp variable, and in this case, it's the 
+# proportion of mthly loan payment to borrower's original loan amount, a 
+# supportive variable created earlier so hence the exploratory variable will 
+# be small percentages.
+ggplot(aes(x = .00055 * round(prop_MthlyPymt / .00055), y = LoanOriginalAmount), 
+       data = subset(prsprLoanData_smpl, !is.na(prop_MthlyPymt))) +
+  geom_smooth(stat = 'summary', fun.y = mean) +
+  scale_y_continuous(limits = c(0, 40000), breaks = seq(0, 40000, 5000))
+
+```
+
+I thought it would be interesting to explore another one of the exploratory 
+features I created. Here, I'm analyzing **'Proportion of Monthly Payment'** vs. 
+**'LoanOriginalAmount'**. As you can see there are quite a bit of dips and rises
+within the distribution of these value points. What you see now is not nearly 
+as busy as the data was before manipulating the default binning method. And
+by adding the `geom_smooth()` function, while passing parameters
+**stat = summary** and **fun.y = mean**, we can see a smoother depiction of 
+the variables relationship. 
+
+*******************************************************************************
+
+# Bivariate Analysis
+
+### How did the feature(s) of interest vary with other features in the dataset?
+
+Keeping in mind my initial mission plans, barring any unexpected discoveries,
+I was hoping to explore any features that may effect borrower rate. Here are
+a few of the observed relationships I found worthy enough for discussion:
+
+  **1. Borrower Rate vs. Loan Status** \
+       * I chose this plot specifically because it really opened my eyes to how
+         I can select and filter my data for analysis. My first few explorations
+         where quantitative in nature. Now I have the chance to filter by factor
+         variables. Here you can see a clear distinction between
+         **'BorrowerRate'** counts per **'LoanStatus'** category. 
+         
+  **2. Borrower Rate vs. Employment Status** \
+       * Again a quantitative vs. qualitative comparison but still interesting
+         none the less. As I had assumed going in, the **'BorrowerRate'** for 
+         'Not employed' borrowers had the highest mean borrower rate, which, if
+         you think about it,.. makes sense. 
+         
+  **3. Borrower Rate vs. Income Range** \
+       * What's really interesting to see here within this relationship is that
+         as a borrower's income increases, their average borrower rate 
+         decreases. It would be cool to explore what the credit scores and 
+         other features of the data set they might have in common.
+         
+  **4. Borrower Rate vs. Borrower State** \
+       * To appease my curiousity, I wanted to compare my states average 
+         borrower rate to other states. The distribution of mean borrower rate
+         values amongst the states, comparatively speaking, was quite 
+         interesting. There didn't seem to appear to be much fluctuation around
+         .1937, the borrower rate mean for the entire data set. There are a few
+         outliers, however, among a couple states that may warrant further 
+         investigation. 
+         
+### Did you observe any interesting relationships between the other features  
+(not the main feature(s) of interest)?
+
+To my surprise, I actually found my exploration of non-featured exploratory 
+variables to be much more fun and engaging, than the comparisons I set out to 
+originally analyze. Here a few that caught my eye...
+
+  **1. Loan Original Amount vs. Estimated Return** \
+       * This comparison, quantitative in nature, took some adjusting before 
+         finally being able to recognize the slow but steady decline in 
+         **'EstimatedReturn'** as **'LoanOriginalAmount'** increases. I wonder
+         what factors or other features/variables might help cause this erosion
+         in return?
+         
+  **2. Estimated Loss vs. Estimated Return** \
+       * This was a cool relationship to explore because Pearson's correlated
+         coefficient of .571 suggests there is some influence of one variable
+         on the other, it was just a matter of conveying what. With my
+         visualization, I think I've been able to convey the reality that as
+         **'EstimatedLoss'** increases, **'EstimatedReturn'** deminishes. To
+         get a beter look at the distribution of values I took the `quantile()` 
+         function and passed it as an argument to the **'limits = '** 
+         parameter of the `scale_x_continous()` & `scale_y_continuous()`
+         layers.
+         
+  **3. Proportion of Monthly Payments vs. Loan Original Amount** \
+       * I chose to explore one of the variables I created earlier in my 
+         analysis, **'prop_MthlyPymt'** within a relationship pairing. This
+         variable reflects a borrower's monthly loan payment in proportion to
+         their original loan amount. In other words: \
+         **('MonthlyLoanPayment' / 'LoanOriginalAmount')**
+         
+       * With correlation coefficient of -0.302, it would seem these exploratory 
+         variables aren't that correlated. However, -.302 does suggest some 
+         level of influence, so I decided to dig deeper. This quantitative
+         comparison also took some massaging before being able to render 
+         something discernable. From the visualization, we can see drastic 
+         rises and falls, or 'spikes' around 0.025, 0.05, and 0.075 percent.
+         It would be interesting to find out what may have caused those spikes;
+         is it something external from the data set, like the market? Or is it
+         an accompanying feature of the data set that has a negative effect on
+         the relationship's particular value?
+         
+### What was the strongest relationship you found?
+
+The strongest relationship that I explored was **'BorrowerRate'** vs.
+**'EstimatedLoss'**; this quantitative relationship had a correlation
+coefficient of .945 or 94.5%. One would categorize this relationship as
+favorable, and could even use either exploratory variable as a predictor for the
+other due to their strong correlation. 
+
+********************************************************************************
+
+# Multivariate Plots Section
+
+### Borrower Rate vs. Borrower APR vs. Is Borrower Homeowner
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=7, fig.width=10}
+# running pearson's correlated coefficient to view relationship
+with(prsprLoanData_smpl, cor.test(BorrowerRate, BorrowerAPR),
+     method = 'pearson')
+
+# running summary stats for both exploratory variables
+summary(prsprLoanData_smpl$BorrowerRate)
+
+summary(prsprLoanData_smpl$BorrowerAPR)
+
+ggplot(aes(x = BorrowerRate, y = BorrowerAPR), 
+       data = subset(prsprLoanData_smpl, !is.na(BorrowerRate) & 
+                       !is.na(BorrowerAPR))) +
+  geom_jitter(aes(color = IsBorrowerHomeowner), alpha = 1/5) +
+  scale_x_sqrt(limits = c(0, .5), breaks = seq(0, .5, .05)) 
+
+```
+
+Here we have a plot of **'BorrowerRate'** vs **'Borrower APR'** filtered by 
+**'IsBorrowerHomeowner'**. Based on the Pearson's correlated coefficient of
+0.990, which infers a 99% match to a linear relationship, we can visually see
+the linear relationship betweeen **'BorrowerRate'** and **'BorrowerAPR'**. The 
+distinction between is the borrower a home owner or not was created using the 
+exploratory variable **'IsBorrowerHomeowner'** as a filter on the distribution
+of values. 
+
+### Stated Monthly Income vs. Borrower Rate vs. Is Borrower Homeowner
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=4, fig.width=10}
+# running summary stats for both exploratory variables
+summary(prsprLoanData_smpl$StatedMonthlyIncome)
+
+summary(prsprLoanData_smpl$BorrowerRate)
+
+# generating the correlation coefficient
+with(prsprLoanData_smpl, cor.test(StatedMonthlyIncome, BorrowerRate, 
+                                  method = 'pearson'))
+
+# changing the binning default method to adjust scale of plot (950). 
+ggplot(aes(x = 950 * round(StatedMonthlyIncome / 950), y = BorrowerRate), 
+       data = subset(prsprLoanData_smpl, !is.na(BorrowerRate))) +
+  geom_line(aes(color = IsBorrowerHomeowner), stat = 'summary', fun.y = mean) +
+  scale_x_continuous(limits = c(0, 150000), breaks = seq(0, 150000, 10000)) 
+
+```
+
+I was interested in exploring the idea of whether or not income affected
+borrower rates, and if so how? This is what I found:
+
+When comparing **'StatedMonthlyIncome'** to **'BorrowerRate'**, I had to adjust
+the plot quite a bit due to the amount of overplotting. I scaled the 'x'
+variable, in this case **'StatedMonthlyIncome'**, to get a better visual of the
+data. Once I did that, it was much easier to visually understand the
+relationship or lack there of, considering the calculated Pearson coefficient is
+-0.0544. Adding a filter, something simple, like **'IsBorrowerHomeowner'** 
+really provided a nice twist to the visualization. We can clearly see spikes at
+**'StatedMonthlyIncome'** amounts of 25000, 30000, 35000, 40000, 45000, 50000,
+and then less sporadically at 70000 and beyond. 
+
+Now keep in mind these values may seem a bit off, as these are stated monthly
+income amounts. However, in my code manipulation of the 'x' variable, I
+multiplied by 950 (almost a 1000), so inessence the original values, displayed 
+as $xxxx.xx, have one less 'thousands'placed digit, so to compensate for that,  
+you can just remove a '0' from thex-axis parameters to get a truer idea of 
+stated monthly income. Sorry for the mental math explanation... :/
+
+### Employment Status Duration vs. On Time Prosper Payments vs. Emplymnt Status
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=10, fig.width=10}
+# running summary stats for both exploratory variables
+summary(prsprLoanData_smpl$EmploymentStatusDuration)
+
+summary(prsprLoanData_smpl$OnTimeProsperPayments)
+
+# checking the correlation coefficient
+with(prsprLoanData_smpl, cor.test(EmploymentStatusDuration,
+                                  OnTimeProsperPayments, method = 'pearson'))
+
+p58 <- ggplot(aes(x = EmploymentStatusDuration, y = OnTimeProsperPayments),
+              data = subset(prsprLoanData_smpl, 
+                            !is.na(EmploymentStatusDuration))) +
+          geom_line(stat = 'summary', fun.y = mean) 
+
+# plotting EmptStDur vs OnTmPrpPymts, filtered by Income Range
+p59 <- ggplot(aes(x = 10 * round(EmploymentStatusDuration / 10),
+                  y = OnTimeProsperPayments),
+              data = subset(prsprLoanData_smpl, 
+                            !is.na(EmploymentStatusDuration))) +
+          geom_smooth(aes(color = IncomeRange), stat = 'summary', 
+                      fun.y = mean) +
+          theme(legend.position = 'top')
+
+# plotting EmptStDur vs OnTmPrpPymts, filtered by Employment Status
+p60 <- ggplot(aes(x = 10 * round(EmploymentStatusDuration / 10),
+                  y = OnTimeProsperPayments),
+              data = subset(prsprLoanData_smpl, 
+                            !is.na(EmploymentStatusDuration))) +
+          geom_smooth(aes(color = EmploymentStatus), stat = 'summary', 
+                      fun.y = mean) +
+          theme(legend.position = 'top')
+
+grid.arrange(p58, p59, p60, ncol = 1)
+```
+
+I thought this was really cool relationship to explore,
+**'EmploymentStatusDuration'** vs. **'OnTimeProsperPayments'** filtered by
+**'IncomeRange'** and **'EmploymentStatus'**. 
+
+After calculating Pearson's coefficient, 0.0550, I still wanted to explore the 
+relationship between the number of days consecutively a borrower has been 
+employed, versus the number of Prosper loan payments the borrower has made 
+consecutively, and lastly filtered by income range or employment status. One 
+would think there has to be some kind of relationship right? It turns out, not  
+so much. 
+
+Figure 1 just conveys the relationship between **'EmploymentStatusDuration'**
+and **'OnTimeProsperPayments'**. Some adjustments to the variables were needed
+but its clear to see how sporadic the value distribution is. 
+
+Figure 2 filters the visualization of figure 1 by **'IncomeRange'**. Although 
+a bit 'helter-skelter', we clearly see the distinction in value patterns for
+each category of **'IncomeRange'**. What's interesting here is that there's a 
+spike in **'OnTimeProsperPayments'** right around 170 straight days of 
+employment for borrowers within the income range of $1 - $24,999. This anomaly
+definitely warrants further investigation considering none of the other income
+ranges surpass 50 consecutive **'OnTimeProsperPayments'**.
+
+Same goes for figure 3, except this visualization is filtered by
+**'EmploymentStatus'**. Again, we can clearly see the distinction between
+**'EmploymentStatus''**categorical value patterns within the distribution. What
+I do find odd about this however, and maybe this just a perceptional 'thing',
+but shouldn't **'OnTimeProsperPayments'** increase as
+**'EmploymentStatusDuration'** increases? That doesnt really seem to be the
+trend in this data, and that might be worth further exploration... Maybe the
+borrowers are still 'employed' but have a different occupation, who knows. 
+
+### Estimated Effective Yield vs. Estimated Loss vs. Borrower State
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=7, fig.width=10}
+# running summary stats for both exploratory variables
+summary(prsprLoanData_smpl$EstimatedEffectiveYield)
+
+summary(prsprLoanData_smpl$EstimatedLoss)
+
+# checking the correlation coefficient
+with(prsprLoanData_smpl, cor.test(EstimatedEffectiveYield, EstimatedLoss,
+                                  method = 'pearson'))
+
+# plotting exploratory variables filtered by Borrower's State
+ggplot(aes(x = EstimatedEffectiveYield, y = EstimatedLoss), 
+       data = subset(prsprLoanData_smpl, !is.na(EstimatedEffectiveYield) &
+                       !is.na(EstimatedLoss))) +
+  geom_point(aes(color = BorrowerState), stat = 'summary', fun.y = mean) 
+
+```
+
+Oh wow, this is interesting. So we have a decently correlated set of 
+quantitative variables, in **'EstimatedEffectiveYield'** and
+**'EstimatedLoss'**, with correlation coefficient of 0.7862, which is almost a
+linear relationship but not quite. 
+
+This visualization conveys that near linear relationship amongst the value 
+distribution, and more insightfully filters it by borrower state. Based on 
+what I see here, it looks as though the point values within the distribution
+that are the most linear happen to be states marked by pink or purple points
+in the legend of the visualization. This group of values have an
+**'EstimatedEffectiveYield'** range of .5 to .3. 
+
+### Estimated Loss vs. Estimated Return vs Occupation
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=13, fig.width=12}
+# generating some summary statistics for these exploratory variables
+summary(prsprLoanData_smpl$EstimatedLoss)
+summary(prsprLoanData_smpl$EstimatedReturn)
+
+# checking the correlation coefficient
+with(prsprLoanData_smpl, cor.test(EstimatedLoss, EstimatedReturn,
+                                  method = 'pearson'))
+
+# plotting exploratory variables filtered by Occupation
+p61 <- ggplot(aes(x = EstimatedLoss, y = EstimatedReturn), 
+              data = subset(prsprLoanData_smpl, !is.na(EstimatedLoss) & 
+                              !is.na(EstimatedReturn))) +
+          geom_point(aes(color = Occupation)) +
+          theme(legend.position = 'top')
+
+p62 <- ggplot(aes(x = EstimatedLoss, y = EstimatedReturn), 
+              data = subset(prsprLoanData_smpl, !is.na(EstimatedLoss) & 
+                              !is.na(EstimatedReturn))) +
+          geom_point(aes(color = Occupation)) +
+          scale_x_sqrt() +
+          theme(legend.position = 'none')
+
+grid.arrange(p61, p62, ncol = 1)
+```
+
+Ok, so you caught me! I really liked this visualization in the bivariate 
+exploration section of this report, so I thought adding another variable into 
+the equation would really make this plot stand out. And it did. It also doesn't
+hurt that the correlation coefficient between **'EstimatedLoss'** and
+**'EstimatedReturn'** is 0.5712, suggesting some semblance of a relationship.
+Why not throw a categorical variable in the mix and see if we can truly uncover
+some hidden insights? 
+
+Here in figure 1 I compared two quantitative variables by nature, in
+**'EstimatedReturn'** and **'EstimatedLoss'** by plotting their distribution
+relationship and filtering it by the exploratory and factor variable
+**'Occupation'**. We can see a dense value distribution or overplotting between
+0 and 0.15% **'EstimatedLoss'**.
+
+Figure 2 does a much butter job of conveying the vertical overplotting that 
+occurs throughout the distribution of values. I manipulated figure 1's plot 
+and added the `scale_x_sqrt()` function as a layer to scale the x-axis. 
+
+### Loan Original Amount vs. Estimated Return with Facet Wrap of ReasonForLoan
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=13, fig.width=10}
+# calculating the correlation coefficient
+with(prsprLoanData_smpl, cor.test(LoanOriginalAmount, EstimatedReturn,
+                                  method = 'pearson'))
+
+p63 <- ggplot(aes(x = EstimatedReturn, y = LoanOriginalAmount),
+              data = subset(prsprLoanData_smpl, !is.na(EstimatedReturn))) +
+          geom_point(aes(color = ReasonForLoan), alpha = .5, size = 1, 
+                     position = 'jitter') + 
+          facet_wrap(~ EmploymentStatus) 
+
+p64 <- ggplot(aes(x = .01125 * round(EstimatedReturn / .01125), 
+                  y = LoanOriginalAmount),
+              data = subset(prsprLoanData_smpl, !is.na(EstimatedReturn))) +
+          geom_line(aes(color = ReasonForLoan), stat = 'summary', 
+                    fun.y = mean) + 
+          scale_y_log10() +
+          geom_smooth() + 
+          facet_wrap(~ EmploymentStatus)
+
+grid.arrange(p63, p64, ncol = 1)  
+```
+
+Ahhh, the culmination of my exploration efforts, as I attempt to be ambitious
+here. I tried comparing quantitative variables with a negative correlated 
+coefficient of -0.2873 using the scatter plot method to convey the relationship
+in a faceted grid. 
+
+In figure 1, **'LoanOriginalAmount'** and **'EstimatedReturn'** are suggested to 
+have a negative relationship based on the statistical evidence, however, the 
+facet wrapped, scatter plot visualization of their value distribution makes it 
+hard to see the distinction between the **'ReasonForLoan'** variable. The only 
+thing I can really see is the variance in **'EstimatedReturn'** for some of the 
+reasons for a loan. 
+
+Figure 2 attempts to convey the same visualization but instead uses a line plot 
+faceted by **'ReasonForLoan'**. By also adding the `geom_smooth()` layer to this
+plot, we can see a better generalized trend within the data distribution. One
+thing is certainly clear accross all levels of **'ReasonForLoan'**, as the loan
+original amount increases, the estimated return percentage on that loan
+increases as well. To further explore and understand the variance in estimated
+returns for each level of **'ReasonForLoan'**, more manipulation on the 'x' 
+variable would be needed. 
+
+### Borrower Rate vs. Stated Monthly Income Faceted by Credit Grade
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=13, fig.width=10}
+# calculating the correlation coefficient
+with(prsprLoanData_smpl, cor.test(BorrowerRate, StatedMonthlyIncome,
+                                  method = 'pearson'))
+
+p65 <- ggplot(aes(x = log10(.00575 * round(BorrowerRate / .00575) + 1), 
+                  y = StatedMonthlyIncome), 
+              data = subset(prsprLoanData_smpl, !is.na(BorrowerRate))) +
+          geom_jitter(alpha = .5, position = position_jitter(h=0),
+                      aes(color = CreditRange.bucket)) +
+          scale_y_sqrt(limits = c(0, 120000), breaks = seq(0, 120000, 20000)) +
+          stat_summary(fun.y = mean) +
+          geom_smooth() +
+          facet_wrap(~ CreditGrade)
+
+p66 <- ggplot(aes(x = log10(BorrowerRate + 1), y = StatedMonthlyIncome), 
+              data = subset(prsprLoanData_smpl, !is.na(BorrowerRate))) +
+          geom_line(aes(color = CreditGrade), stat = 'summary', fun.y = mean) +
+          scale_y_sqrt(limits = c(0, 120000), breaks = seq(0, 120000, 20000)) +
+          geom_smooth() +
+          facet_wrap(~ CreditRange.bucket)
+
+grid.arrange(p65, p66, ncol = 1)
+```
+
+In my last exploration of multivariate plots, I chose to compare the
+**'BorrowerRate'** vs. **'StatedMonthlyIncome'** filtered and faceted by both 
+**'CreditRange.bucket'** and **'CreditGrade'**. 
+
+Here in figure 1 we can see a value distribution of **'BorrowerRate'** versus 
+**'StatedMonthlyIncome'** and filtered by **'CreditRange.bucket'**. This 
+visualization was then faceted by **'CreditGrade'** to show the data
+distribution via each level. There seems to be quite a bit of overplotting in
+the unmarked categorical level **' '** within **'CreditGrade'**. I think this is
+due to the credit grade rating only being available to listings pre-2009. So
+this **' '** category in **'CreditGrade'** and the densely distributed or
+overplotted, and unlabeled visualization in figure 1 most likely represents
+borrowers within the data set whose **'ListingCreationDates'** are post 2009,
+where a different rating was used.
+
+In figure 2, we used the same comparison, but switched our filters and facet
+wrapping variable. Here, I chose to use **'CreditGrade'** as my filter, and 
+facet wrapped the visualization using **'CreditRange.bucket'**. I also chose to
+use line plot method in hopes of conveying a better look at the relationship's
+distribution. What seems interesting and may warrant further exploration, is the 
+fact that income range buckets (650-700] & (850-900] showed the largest spikes
+in stated monthly incomes, hitting near $8000 and $10000 respectively.
+
+# Multivariate Analysis
+
+### Were there features that strengthened each other in terms of looking at  
+your feature(s) of interest?
+
+Based on my multivariate analysis of this data set, I would have to say there 
+are a few relationships that I explored were I thought the feature(s) of 
+interest were strengthened by accompanying exploratory variables. 
+For instance:
+
+**Borrower Rate vs. Stated Monthly Income, filtered by Is Borrower Homeowner**\
+  * For as simple as this plot is, I found it quite telling and insightful. 
+    Its clear to see the trend that exists within the visualization; borrowers
+    who are home owners, seem to have decreasing borrower rates, as their 
+    stated monthly income increases versus those borrowers who aren't home 
+    owners, we see their borrower rates increasing as stated monthly income 
+    increases as well. When calculating the Pearson coefficient, statistical 
+    evidence revealed a negative relationship, -0.0544 and not much correlation, 
+    which appears to be true but I can't help but wonder about the visibly
+    decreasing and increasing borrower rates. And they say there isn't much
+    correlation?
+    
+### Were there any interesting or surprising interactions between features?
+
+I found the relationship between **'OnTimeProsperPayments'** and
+**'EmploymentStatusDuration'**, filtered by **'IncomeRange'** to have the most
+surprising effect on my exploration. I wasn't expecting it at all really. In
+fact, I was thinking the complete opposite. I had originally assumed that the
+longer a borrower's employment status duration was, the likely hood their on
+time prosper payments would increase. This wasn't really the case here. What I
+found odd was that for borrowers with income ranges above $50,000 there seemed to
+be a peak 50 consecutive prosper loan payments and nothing beyond that
+threshold. What makes the anomaly intriguing is that only the income range
+from $1 - $24,999 hit the mark of 50 plus consectutive on time loan payments. 
+
+********************************************************************************
+
+# Final Plots and Summary
+
+### Plot One
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=8, fig.width=10}
+# checking the correlation between these two exploratory variables
+with(prsprLoanData_smpl, cor.test(BorrowerRate, (as.numeric(LoanStatus))),
+     method = 'pearson')
+
+# using the grouped data frame by loan status created earlier for subsequent
+# plot
+lnStats_by_LoanSts
+
+# generating some basic stats for the lnStats_by_LoanSts data frame
+summary(lnStats_by_LoanSts)
+
+p36 <- ggplot(aes(x = BorrowerRate), data = subset(prsprLoanData_smpl, 
+                                                   !is.na(LoanStatus))) +
+          scale_x_continuous(limits = c(0, 0.50), breaks = seq(0, 0.5, 0.05)) +
+          scale_y_sqrt() +
+          geom_histogram(aes(color = LoanStatus)) +
+          xlab('Borrower Rate (%)') +
+          ylab('Loan Status Count (# of Borrowers)') + 
+          ggtitle('Borrower Rate Counts By Loan Status')
+
+# using an exploratory variable from the grouped data frame by loan status 
+# created earlier 'lnStats_by_LoanSts'
+
+# Loan Status vs. Borrower Rate Mean
+p37 <- ggplot(aes(y = LoanStatus, x = borrower_rate_mean), 
+              data = lnStats_by_LoanSts) +
+          geom_point(aes(color = LoanStatus)) +
+          xlab('Borrower Rate Mean (%), (mean borrower rate for the group)') +
+          ylab('Loan Status') +
+          ggtitle('Borrower Rate Mean By Loan Status') 
+          #coord_flip()
+
+grid.arrange(p36, p37, ncol = 1)
+```
+
+### Description One
+
+I chose this visualization as one of my final plots to represent my exploration
+because it's quite telling. There are few things here that, for me, 
+immediately raised a few questions, some of which I had a chance to explore, 
+and others, not yet. 
+
+I figure 1, I was interested in finding out the distribution of borrower rates
+by loan status. I was hoping to find some relationship between the status of 
+the loan and if it effected the borrower rate in any way. What I found however,
+was a count of borrower rates, for each category of **'LoanStatus'** in my 
+visualization. It wasn't giving me the answers I wanted. That's what led me to
+create the **'lnStats_by_LoanSts'** data frame with summarized exloratory
+variables I wanted to explore, for instance borrower rate mean for each group in
+**'LoanStatus'**. So, in figure 2, I used the **'borrower_rate_mean'** variable
+I created and tah dah! This was what I was interested in. In this point plot, we
+can see the average, or mean borrower rate for each category of
+**'LoanStatus'**. What's interesting is there's a small grouping of
+**'LoanStatus'** categories between .23 and .24 percent borrower rate, and they
+all seem to be **'Past Due...'** levels. Anthing thing to note is the gap
+between .20 and .22 - there's nothing at all, not a single value, which just
+seems quite odd for a distribution. Maybe it warrants further investigation,
+but not today. 
+
+### Plot Two
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=8, fig.width=10}
+# generating some summary statistics of these exploratory variables
+summary(prsprLoanData_smpl$BorrowerRate)
+summary(prsprLoanData_smpl$IncomeRange)
+
+# generating some basic statistics regarding correlation coefficient using 
+# Pearson's method
+with(prsprLoanData_smpl, cor.test(BorrowerRate, (as.numeric(IncomeRange)), 
+     method = 'pearson'))
+
+# plotting borrower rate vs. income range, using income range as a filter
+# and facetting by inc range
+p40 <- ggplot(aes(x = BorrowerRate), data = prsprLoanData_smpl) +
+          geom_histogram(aes(color = IncomeRange)) +
+          facet_wrap(~IncomeRange) +
+          xlab('Borrower Rate (%)') +
+          ylab('Borrower Count') +
+          ggtitle('Borrower Rate Count Per Income Range') +
+          scale_y_sqrt()
+
+# plotting the traditional comparison using x,y for both exploratory variables
+p41 <- ggplot(aes(x = IncomeRange, y = BorrowerRate), 
+              data = prsprLoanData_smpl) +
+          geom_boxplot(aes(color = IncomeRange)) +
+          xlab('Income Range ($)') +
+          ylab('Borrower Rate (%)') +
+          ggtitle('Borrower Rates By Income Range')
+
+grid.arrange(p40, p41, ncol = 1) 
+```
+
+### Description Two
+
+My initial game plan was to explore potential, or what I thought might have
+a potential influence on borrower rates. This plot, though relatively 
+simplistic in its nature really helped my analysis in two areas: 
+First, it confirmed some of the preconceptions that I had about the data. For 
+example, I had assumed that richer borrowers would have lower interest rates, or
+borrower rates (for the purpose of this project, :) ) due to affluency. 
+And second, it helped me truly organize my analysis and what exploratory 
+variables I would analyze. I understand the purpose of the `ggpairs()` function
+and what it does. But sometimes, scatter plot matrices have a difficult time
+conveying relationships between quantitative vs qualitative variables. At least
+for me, I have a hard time discerning their relationships. Using categorical/
+factor variables really adds a strong metric to visualizations. It allows you
+to filter your data quite selectively. Enough of why I chose this plot, "To
+the explanation!:"
+
+In figure 1 the visualization conveys the borrower rate counts for each level
+in **'IncomeRange'**. What's great about using the `facet_wrap()` function as an 
+additional layer to my plot is that you can compare each level's distribution
+to itself, or to other levels. It really disects your data in truly insightful
+ways. Because of this, we can clearly see income ranges  between 
+$25,000 - $74,999 have the largest distribution of borrower counts. What's also
+obvious, and somewhat expected is the low borrower count for **'IncomeRange'**
+category, 'Not employed'; Who wants to lend money to someone without a job?, I 
+get it. But I'm glad, based on this data, that someone took a chance on this 
+group of borrowers. 
+
+Figure 2, can easily be one of my top 5 plots in this project. For one, it 
+helped pat my ego a bit, by confirming one of my preconceptions mention 
+earlier, but two and most importantly of course, is how easy it is to 
+compare the data for each income range to another; either min, max or mean, it 
+doesn't matter. Here we clearly see a downward trend in borrower rate mean as
+income range increases. It also looks as though **'IncomeRange'** category 
+'Not employed' has the highest borrower rate mean of the group at just over
+.25%. What I'd really like to explore are the credit ranges for some of these 
+income range groups, especially those with lower borrower rate means. 
+
+### Plot Three
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.height=10, fig.width=10}
+# running summary stats for both exploratory variables
+summary(prsprLoanData_smpl$EmploymentStatusDuration)
+
+summary(prsprLoanData_smpl$OnTimeProsperPayments)
+
+# checking the correlation coefficient
+with(prsprLoanData_smpl, cor.test(EmploymentStatusDuration,
+                                  OnTimeProsperPayments, method = 'pearson'))
+
+p58 <- ggplot(aes(x = EmploymentStatusDuration, y = OnTimeProsperPayments),
+              data = subset(prsprLoanData_smpl, 
+                            !is.na(EmploymentStatusDuration))) +
+          geom_line(stat = 'summary', fun.y = mean) +
+          xlab('Employment Status Duration (# of consecutive days employed)') +
+          ylab('Number of On Time Prosper Payments Made') +
+          ggtitle('Number of On Time Prosper Payments Based on Employment 
+                   Status Duration')
+
+# plotting EmptStDur vs OnTmPrpPymts, filtered by Income Range
+p59 <- ggplot(aes(x = 10 * round(EmploymentStatusDuration / 10),
+                  y = OnTimeProsperPayments),
+              data = subset(prsprLoanData_smpl, 
+                            !is.na(EmploymentStatusDuration))) +
+          geom_smooth(aes(color = IncomeRange), stat = 'summary', 
+                      fun.y = mean) +
+          xlab('Employment Status Duration (# of consecutive days employed)') +
+          ylab('Number of On Time Prosper Payments Made') +
+          ggtitle('Employment Status Duration and Income Ranges Effect on On
+                   Time Prosper Payments')
+          theme(legend.position = 'top')
+
+# plotting EmptStDur vs OnTmPrpPymts, filtered by Employment Status
+p60 <- ggplot(aes(x = 10 * round(EmploymentStatusDuration / 10),
+                  y = OnTimeProsperPayments),
+              data = subset(prsprLoanData_smpl, 
+                            !is.na(EmploymentStatusDuration))) +
+          geom_smooth(aes(color = EmploymentStatus), stat = 'summary', 
+                      fun.y = mean) +
+          xlab('Employment Status Duration (# of consecutive days employed)') +
+          ylab('Number of On Time Prosper Payments Made') +
+          ggtitle('Employment Status and Employment Status Durations Effect
+                   on On Time Prosper Payments') + 
+          theme(legend.position = 'top')
+
+grid.arrange(p58, p59, p60, ncol = 1)
+```
+
+### Description Three
+
+This was a great exploration of quantitative variables and using categorical
+ones to filter the distribution. I was curious in finding out if a borrower's 
+employment status, in terms of their tenure at work, affected whether or not 
+they made on time loan payments. And more interestingly, are on time loan 
+payments affected by employment status? This journey helped answer some of those
+questions. 
+
+In figure 1 my initial gander at the two variables expressed an interesting
+trend, which too, was also one of my preconceptions about the data: As 
+employment status duration increases, so should the number of on time payments
+made, right? It seems so. I mean, there is some variance but the pattern seems 
+to trend upward and increase in **'OnTimeProsperPayments'** as
+**'EmploymentStatusDuration'** increases. At first I was bit confused as why the
+count of on time payments wasn't much more than 40 for the first 200 or so days.
+Then it dawned on me... a year is 365 days, which isn't long when it comes to
+employment duration, so the low fluctuation in **'OnTimeProsperPayments'**
+before 200 days makes sense. And as an employees tenure at work extends, so
+should the number of on time payments which is represented in the data with
+sudden upticks or spikes around 250 days and beyond. 
+
+Figure 2 is just a filtered plot of figure 1. I chose to use the
+**'IncomeRange'** variable to see if it had any influence or effect on
+**'OnTimeProsperPayments'**. What I found was a bit unexpected - For the largest
+income range, $100,000, there seemed to be a downward trend in the number of on
+time payments as employment status duration increased. I also noticed that only
+one category in **'IncomeRange'** had count of **'OnTimeProsperPayments'** over
+50. This partially led me to believe that value was just an anomoly withing the
+distribution. Further exploration is definitely needed. 
+
+Lastly, figure 3 is again a plot of **"EmploymentStatusDuration's"**
+relationship with **'OnTimeProsperPayments'** filtered by
+**'EmploymentStatus'**. Here we can see there is quite a bit of variance between
+employment status levels, and their counts for **'OnTimeProsperPayments'** made.
+What stood out the most to me here was the category of 'Self-employed'. It
+showed a gradual upward trend in the number of on time payments made. The
+'Employed' status seemed to have the least amount of variance in its
+distrubution as well. 
+
+# Reflection
+
+The loan data set was comprised of about 114,000 observations with 80+ variables
+to explore. I was originally interested in borrower rate, and what variables,
+if any, might effect its value. What I found was more questions than what I 
+started with.  
+
+It was good to see that some of my preconceptions weren't too far off, however,
+some discoveries where straight out of left field for me though. For example,
+when comparing **'StatedMonthlyIncome'** vs. **'BorrowerRate'** and filtering on 
+**'IsBorrowerHomeowner'**, I noticed that borrower rates drastically reduced for 
+homeowners who stated a monthly income of $7,000 or more. What could that be due
+to? Or how about the visualization conveying average borrower rates by state. I
+thought for sure I'd find someting interesting there but the variance in min,
+max and mean borrower rates didn't fluctuate too much. 
+
+My insightful explorations that really rung loud for me were my final plot 
+selections. I realized, to truly find insight and patterns in data, you have to 
+leverage the categorical variables within your data set. Line charts and scatter
+plot graphs are useful but when you segment your data in a way that groups your 
+exploration, its incredible what you can find or explore. 
+
+My limitations here, at least within my analysis, is that I didn't explore the 
+possibility of a timeseries, and maybe analyzing selected borrowers rates over 
+time, and explore the variables that may or may not have changed during that 
+time to determine influencers in borrowing rate, or interest rate. I could have
+also manipulated the data frame a bit more. It's currently in 'wide' format, and
+my comfortability with using the 'dplyr' & 'tidyr' libraries is mediocre at 
+best. I'm sure if I could manipulate this data more efficiently, there's a world
+of insight to uncover here. As a newbie to R, hint another limitation, I found
+it a bit harder to debug because I just wasn't familiar with the syntax or style
+of the programming language. I kept subconsciously injecting Pythonic code into 
+my attempts at analyzing data. It would take a sec before I realized the error 
+in my ways... lol. Don't judge me. Lastly, my biggest frustration however was
+formatting my project in R markdown. I'm not to familiar with the syntax so this
+was difficult, especially creating multi-line headers,  and tables within my
+report. This was fun though. Keep 'em coming. :) 
